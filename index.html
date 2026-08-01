@@ -67,11 +67,11 @@
 
         // Konfiguration der Dringlichkeitsstufen
         const URGENCY_LEVELS = {
-            1: { label: 'In Arbeit', colorClass: 'text-red-400', bgClass: 'bg-red-400/10 border-red-400/20' },
-            2: { label: 'Als Nächstes', colorClass: 'text-orange-400', bgClass: 'bg-orange-400/10 border-orange-400/20' },
-            3: { label: 'Auf dem Schirm', colorClass: 'text-yellow-400', bgClass: 'bg-yellow-400/10 border-yellow-400/20' },
-            4: { label: 'Wenn Zeit ist', colorClass: 'text-blue-400', bgClass: 'bg-blue-400/10 border-blue-400/20' },
-            5: { label: 'Ideenspeicher', colorClass: 'text-slate-400', bgClass: 'bg-slate-400/10 border-slate-400/20' }
+            1: { label: 'Priorität 1', colorClass: 'text-red-400', bgClass: 'bg-red-400/10 border-red-400/20' },
+            2: { label: 'Priorität 2', colorClass: 'text-orange-400', bgClass: 'bg-orange-400/10 border-orange-400/20' },
+            3: { label: 'Priorität 3', colorClass: 'text-yellow-400', bgClass: 'bg-yellow-400/10 border-yellow-400/20' },
+            4: { label: 'Priorität 4', colorClass: 'text-blue-400', bgClass: 'bg-blue-400/10 border-blue-400/20' },
+            5: { label: 'Priorität 5', colorClass: 'text-slate-400', bgClass: 'bg-slate-400/10 border-slate-400/20' }
         };
 
         const Dashboard = ({ projects, onCreateProject, onOpenProject, onDeleteProject, onEditProject }) => {
@@ -198,7 +198,7 @@
                                                             )}
                                                         </h2>
                                                         <div className={`inline-flex w-max items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${URGENCY_LEVELS[currentUrgency].bgClass} ${URGENCY_LEVELS[currentUrgency].colorClass}`}>
-                                                            <Icons.Flag /> Stufe {currentUrgency}
+                                                            <Icons.Flag /> {URGENCY_LEVELS[currentUrgency].label}
                                                         </div>
                                                     </div>
                                                     
