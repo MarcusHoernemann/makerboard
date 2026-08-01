@@ -7,7 +7,7 @@
     
     <!-- PWA Verknüpfungen (Installierbarkeit) -->
     <link rel="manifest" href="manifest.json" />
-    <meta name="theme-color" content="#10b981" />
+    <meta name="theme-color" content="#3b82f6" />
     <link rel="apple-touch-icon" href="logo.png" />
     
     <!-- Tailwind CSS laden -->
@@ -24,7 +24,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 </head>
-<body class="bg-slate-900 text-slate-100 font-sans selection:bg-emerald-500/30">
+<body class="bg-slate-900 text-slate-100 font-sans selection:bg-blue-500/30">
     <div id="root"></div>
 
     <script type="text/babel">
@@ -32,20 +32,17 @@
 
         // =========================================================================
         // CLOUD SYNC EINSTELLUNGEN
-        // Wenn du den Sync zwischen PC und Handy willst, musst du dir unter 
-        // console.firebase.google.com ein kostenloses Projekt erstellen (Firestore Database)
-        // und die Daten hier eintragen. Danach stellst du USE_CLOUD_SYNC auf true.
         // =========================================================================
         const USE_CLOUD_SYNC = true; 
         
         const firebaseConfig = {
-  apiKey: "AIzaSyCXDryC4C6ii9eacgtj_ALN_wsLxL-bwiw",
-  authDomain: "makerboard-488ad.firebaseapp.com",
-  projectId: "makerboard-488ad",
-  storageBucket: "makerboard-488ad.firebasestorage.app",
-  messagingSenderId: "663732219493",
-  appId: "1:663732219493:web:36e2b59cd6e7437213608c",
-  measurementId: "G-5JTLFGXR1V"
+            apiKey: "AIzaSyCXDryC4C6ii9eacgtj_ALN_wsLxL-bwiw",
+            authDomain: "makerboard-488ad.firebaseapp.com",
+            projectId: "makerboard-488ad",
+            storageBucket: "makerboard-488ad.firebasestorage.app",
+            messagingSenderId: "663732219493",
+            appId: "1:663732219493:web:36e2b59cd6e7437213608c",
+            measurementId: "G-5JTLFGXR1V"
         };
 
         let db = null;
@@ -64,26 +61,52 @@
             Clock: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>,
             Edit: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>,
             ArrowUp: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>,
-            ArrowDown: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
+            ArrowDown: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>,
+            Flag: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg>
+        };
+
+        // Konfiguration der Dringlichkeitsstufen
+        const URGENCY_LEVELS = {
+            1: { label: 'In Arbeit', colorClass: 'text-red-400', bgClass: 'bg-red-400/10 border-red-400/20' },
+            2: { label: 'Als Nächstes', colorClass: 'text-orange-400', bgClass: 'bg-orange-400/10 border-orange-400/20' },
+            3: { label: 'Auf dem Schirm', colorClass: 'text-yellow-400', bgClass: 'bg-yellow-400/10 border-yellow-400/20' },
+            4: { label: 'Wenn Zeit ist', colorClass: 'text-blue-400', bgClass: 'bg-blue-400/10 border-blue-400/20' },
+            5: { label: 'Ideenspeicher', colorClass: 'text-slate-400', bgClass: 'bg-slate-400/10 border-slate-400/20' }
         };
 
         const Dashboard = ({ projects, onCreateProject, onOpenProject, onDeleteProject, onEditProject }) => {
             const [newProjectName, setNewProjectName] = useState('');
+            const [newProjectUrgency, setNewProjectUrgency] = useState(3);
             const [editingId, setEditingId] = useState(null);
             const [editName, setEditName] = useState('');
+            const [editUrgency, setEditUrgency] = useState(3);
 
             const handleCreate = (e) => {
                 e.preventDefault();
                 if (newProjectName.trim()) {
-                    onCreateProject(newProjectName);
+                    onCreateProject(newProjectName, newProjectUrgency);
                     setNewProjectName('');
+                    setNewProjectUrgency(3);
                 }
+            };
+
+            const startEditing = (project) => {
+                setEditingId(project.id);
+                setEditName(project.name);
+                setEditUrgency(project.urgency || 3);
+            };
+
+            const saveEditing = (projectId) => {
+                if (editName.trim()) {
+                    onEditProject(projectId, { name: editName.trim(), urgency: editUrgency });
+                }
+                setEditingId(null);
             };
 
             return (
                 <div className="max-w-3xl mx-auto p-4 sm:p-6">
                     <header className="mb-8 mt-4">
-                        <h1 className="text-3xl font-bold text-emerald-500 tracking-tight">Makerboard</h1>
+                        <h1 className="text-3xl font-bold text-blue-500 tracking-tight">Makerboard</h1>
                         <p className="text-slate-400 mt-2">Mein Maker-Projekte Manager.</p>
                         {!USE_CLOUD_SYNC && (
                             <div className="mt-4 p-3 bg-amber-900/40 border border-amber-500/30 text-amber-200 text-sm rounded-lg">
@@ -92,18 +115,27 @@
                         )}
                     </header>
 
-                    <form onSubmit={handleCreate} className="mb-8 flex gap-3">
+                    <form onSubmit={handleCreate} className="mb-8 flex flex-col sm:flex-row gap-3">
                         <input
                             type="text"
                             value={newProjectName}
                             onChange={(e) => setNewProjectName(e.target.value)}
                             placeholder="Neues Projekt (z.B. Roboterarm)..."
-                            className="flex-1 bg-slate-800 border border-slate-700 text-slate-100 rounded-xl px-4 py-3 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
+                            className="flex-1 bg-slate-800 border border-slate-700 text-slate-100 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
                         />
+                        <select
+                            value={newProjectUrgency}
+                            onChange={(e) => setNewProjectUrgency(Number(e.target.value))}
+                            className="bg-slate-800 border border-slate-700 text-slate-100 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all cursor-pointer"
+                        >
+                            {Object.entries(URGENCY_LEVELS).map(([key, config]) => (
+                                <option key={key} value={key}>{config.label}</option>
+                            ))}
+                        </select>
                         <button
                             type="submit"
                             disabled={!newProjectName.trim()}
-                            className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-5 py-3 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-lg shadow-emerald-900/20"
+                            className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-5 py-3 rounded-xl font-medium flex items-center justify-center gap-2 transition-colors shadow-lg shadow-blue-900/20"
                         >
                             <Icons.Plus /> <span className="hidden sm:inline">Erstellen</span>
                         </button>
@@ -120,6 +152,7 @@
                                 const completed = project.sections?.filter(s => s.completed).length || 0;
                                 const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
                                 const isCompleted = total > 0 && progress === 100;
+                                const currentUrgency = project.urgency || 3;
 
                                 return (
                                     <div 
@@ -127,54 +160,64 @@
                                         onClick={() => { if(editingId !== project.id) onOpenProject(project); }}
                                         className={`border p-5 rounded-2xl cursor-pointer hover:shadow-xl transition-all group relative ${
                                             isCompleted 
-                                                ? 'bg-emerald-900/10 border-emerald-500/30 hover:border-emerald-400' 
-                                                : 'bg-slate-800 border-slate-700 hover:border-emerald-500'
+                                                ? 'bg-blue-900/10 border-blue-500/30 hover:border-blue-400' 
+                                                : 'bg-slate-800 border-slate-700 hover:border-blue-500'
                                         }`}
                                     >
                                         <div className="flex justify-between items-start mb-4">
                                             {editingId === project.id ? (
-                                                <input 
-                                                    type="text" 
-                                                    value={editName}
-                                                    autoFocus
-                                                    onChange={(e) => setEditName(e.target.value)}
-                                                    onBlur={() => {
-                                                        if (editName.trim() && editName !== project.name) onEditProject(project.id, editName.trim());
-                                                        setEditingId(null);
-                                                    }}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter') {
-                                                            if (editName.trim() && editName !== project.name) onEditProject(project.id, editName.trim());
-                                                            setEditingId(null);
-                                                        }
-                                                        if (e.key === 'Escape') setEditingId(null);
-                                                    }}
-                                                    className="text-xl font-semibold bg-slate-900 text-slate-100 border border-emerald-500 rounded px-2 py-1 w-full mr-12 focus:outline-none"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                />
+                                                <div className="flex flex-col gap-3 w-full pr-8" onClick={e => e.stopPropagation()}>
+                                                    <input 
+                                                        type="text" 
+                                                        value={editName}
+                                                        autoFocus
+                                                        onChange={(e) => setEditName(e.target.value)}
+                                                        className="text-lg font-semibold bg-slate-900 text-slate-100 border border-blue-500 rounded px-3 py-2 w-full focus:outline-none"
+                                                    />
+                                                    <select 
+                                                        value={editUrgency}
+                                                        onChange={(e) => setEditUrgency(Number(e.target.value))}
+                                                        className="bg-slate-900 text-slate-100 border border-slate-700 rounded px-3 py-2 w-full focus:outline-none focus:border-blue-500 text-sm"
+                                                    >
+                                                        {Object.entries(URGENCY_LEVELS).map(([key, config]) => (
+                                                            <option key={key} value={key}>{config.label}</option>
+                                                        ))}
+                                                    </select>
+                                                    <div className="flex gap-2">
+                                                        <button onClick={() => saveEditing(project.id)} className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 text-white rounded font-medium">Speichern</button>
+                                                        <button onClick={() => setEditingId(null)} className="px-3 py-1.5 text-sm bg-slate-700 hover:bg-slate-600 text-slate-200 rounded">Abbrechen</button>
+                                                    </div>
+                                                </div>
                                             ) : (
-                                                <h2 className="text-xl font-semibold text-slate-100 pr-16 flex items-center gap-3 flex-wrap">
-                                                    {project.name}
-                                                    {isCompleted && (
-                                                        <span className="text-xs font-bold uppercase tracking-wider bg-emerald-500 text-slate-900 px-2 py-1 rounded-md">Fertig</span>
-                                                    )}
-                                                </h2>
+                                                <>
+                                                    <div className="flex flex-col gap-2 pr-12">
+                                                        <h2 className="text-xl font-semibold text-slate-100 flex items-center gap-3 flex-wrap">
+                                                            {project.name}
+                                                            {isCompleted && (
+                                                                <span className="text-xs font-bold uppercase tracking-wider bg-blue-500 text-slate-900 px-2 py-1 rounded-md">Fertig</span>
+                                                            )}
+                                                        </h2>
+                                                        <div className={`inline-flex w-max items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${URGENCY_LEVELS[currentUrgency].bgClass} ${URGENCY_LEVELS[currentUrgency].colorClass}`}>
+                                                            <Icons.Flag /> Stufe {currentUrgency}
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); startEditing(project); }}
+                                                            className="text-slate-500 hover:text-blue-400 p-2 bg-slate-800/80 rounded-lg backdrop-blur-sm"
+                                                        >
+                                                            <Icons.Edit />
+                                                        </button>
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); onDeleteProject(project.id); }}
+                                                            className="text-slate-500 hover:text-red-400 p-2 bg-slate-800/80 rounded-lg backdrop-blur-sm"
+                                                        >
+                                                            <Icons.Trash />
+                                                        </button>
+                                                    </div>
+                                                </>
                                             )}
-                                            
-                                            <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button 
-                                                    onClick={(e) => { e.stopPropagation(); setEditingId(project.id); setEditName(project.name); }}
-                                                    className="text-slate-500 hover:text-emerald-400 p-2 bg-slate-800/80 rounded-lg backdrop-blur-sm"
-                                                >
-                                                    <Icons.Edit />
-                                                </button>
-                                                <button 
-                                                    onClick={(e) => { e.stopPropagation(); onDeleteProject(project.id); }}
-                                                    className="text-slate-500 hover:text-red-400 p-2 bg-slate-800/80 rounded-lg backdrop-blur-sm"
-                                                >
-                                                    <Icons.Trash />
-                                                </button>
-                                            </div>
                                         </div>
                                         
                                         <div className="flex justify-between text-sm text-slate-400 mb-2">
@@ -182,7 +225,7 @@
                                             <span>{progress}%</span>
                                         </div>
                                         <div className="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden">
-                                            <div className="bg-emerald-500 h-2.5 rounded-full transition-all" style={{ width: `${progress}%` }}></div>
+                                            <div className="bg-blue-500 h-2.5 rounded-full transition-all" style={{ width: `${progress}%` }}></div>
                                         </div>
                                     </div>
                                 );
@@ -252,7 +295,7 @@
                                             <button 
                                                 onClick={() => onToggleSection(project.id, section.id, !section.completed)}
                                                 className={`shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all duration-300 relative z-10 shadow-lg ${
-                                                    section.completed ? 'bg-emerald-500 border-emerald-500 text-slate-900 shadow-emerald-500/30' : 'bg-slate-900 border-slate-500 text-transparent'
+                                                    section.completed ? 'bg-blue-500 border-blue-500 text-slate-900 shadow-blue-500/30' : 'bg-slate-900 border-slate-500 text-transparent'
                                                 }`}
                                             >
                                                 <Icons.Check />
@@ -264,13 +307,13 @@
                                                 {editingId === section.id ? (
                                                     <div className="flex flex-col gap-3">
                                                         <div className="flex gap-2">
-                                                            <input type="text" value={editData.title} onChange={e => setEditData({...editData, title: e.target.value})} className="flex-1 bg-slate-900 border border-slate-700 text-slate-100 rounded-lg px-3 py-2" placeholder="Titel"/>
-                                                            <input type="number" step="0.5" min="0" value={editData.duration} onChange={e => setEditData({...editData, duration: e.target.value})} className="w-20 bg-slate-900 border border-slate-700 text-slate-100 rounded-lg px-3 py-2 text-center" placeholder="Std."/>
+                                                            <input type="text" value={editData.title} onChange={e => setEditData({...editData, title: e.target.value})} className="flex-1 bg-slate-900 border border-slate-700 text-slate-100 rounded-lg px-3 py-2 focus:border-blue-500 outline-none" placeholder="Titel"/>
+                                                            <input type="number" step="0.5" min="0" value={editData.duration} onChange={e => setEditData({...editData, duration: e.target.value})} className="w-20 bg-slate-900 border border-slate-700 text-slate-100 rounded-lg px-3 py-2 text-center focus:border-blue-500 outline-none" placeholder="Std."/>
                                                         </div>
-                                                        <textarea value={editData.description} onChange={e => setEditData({...editData, description: e.target.value})} className="w-full bg-slate-900 border border-slate-700 text-slate-100 rounded-lg px-3 py-2 text-sm" placeholder="Beschreibung..." rows="2"></textarea>
+                                                        <textarea value={editData.description} onChange={e => setEditData({...editData, description: e.target.value})} className="w-full bg-slate-900 border border-slate-700 text-slate-100 rounded-lg px-3 py-2 text-sm focus:border-blue-500 outline-none" placeholder="Beschreibung..." rows="2"></textarea>
                                                         <div className="flex gap-2 justify-end">
                                                             <button onClick={() => setEditingId(null)} className="px-3 py-1.5 text-sm text-slate-400">Abbrechen</button>
-                                                            <button onClick={() => handleSaveEdit(section.id)} className="px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg">Speichern</button>
+                                                            <button onClick={() => handleSaveEdit(section.id)} className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 text-white rounded-lg">Speichern</button>
                                                         </div>
                                                     </div>
                                                 ) : (
@@ -283,9 +326,9 @@
                                                             {section.description && <p className="text-sm text-slate-400 mt-2 whitespace-pre-wrap leading-relaxed">{section.description}</p>}
                                                         </div>
                                                         <div className="flex flex-col sm:flex-row gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity ml-4 shrink-0">
-                                                            <button onClick={(e) => { e.stopPropagation(); onMoveSection(project.id, index, -1); }} disabled={index === 0} className="text-slate-500 hover:text-emerald-400 disabled:opacity-20 p-2"><Icons.ArrowUp /></button>
-                                                            <button onClick={(e) => { e.stopPropagation(); onMoveSection(project.id, index, 1); }} disabled={index === sections.length - 1} className="text-slate-500 hover:text-emerald-400 disabled:opacity-20 p-2"><Icons.ArrowDown /></button>
-                                                            <button onClick={() => { setEditingId(section.id); setEditData({ title: section.title, duration: section.duration || '', description: section.description || '' }); }} className="text-slate-500 hover:text-emerald-400 p-2"><Icons.Edit /></button>
+                                                            <button onClick={(e) => { e.stopPropagation(); onMoveSection(project.id, index, -1); }} disabled={index === 0} className="text-slate-500 hover:text-blue-400 disabled:opacity-20 p-2"><Icons.ArrowUp /></button>
+                                                            <button onClick={(e) => { e.stopPropagation(); onMoveSection(project.id, index, 1); }} disabled={index === sections.length - 1} className="text-slate-500 hover:text-blue-400 disabled:opacity-20 p-2"><Icons.ArrowDown /></button>
+                                                            <button onClick={() => { setEditingId(section.id); setEditData({ title: section.title, duration: section.duration || '', description: section.description || '' }); }} className="text-slate-500 hover:text-blue-400 p-2"><Icons.Edit /></button>
                                                             <button onClick={() => onDeleteSection(project.id, section.id)} className="text-slate-500 hover:text-red-400 p-2"><Icons.Trash /></button>
                                                         </div>
                                                     </div>
@@ -301,11 +344,11 @@
                     <div className="fixed bottom-0 left-0 right-0 p-4 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 z-50">
                         <form onSubmit={handleAdd} className="max-w-3xl mx-auto flex flex-col gap-2">
                             <div className="flex gap-2 sm:gap-3">
-                                <input type="text" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Neuer Abschnitt..." className="flex-1 bg-slate-800 border border-slate-700 text-slate-100 rounded-xl px-4 py-3 focus:border-emerald-500 outline-none" />
-                                <input type="number" step="0.5" min="0" value={newDuration} onChange={(e) => setNewDuration(e.target.value)} placeholder="Std." className="w-20 bg-slate-800 border border-slate-700 text-slate-100 rounded-xl px-3 py-3 focus:border-emerald-500 outline-none text-center" />
-                                <button type="submit" disabled={!newTitle.trim()} className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-4 sm:px-6 py-3 rounded-xl"><Icons.Plus /></button>
+                                <input type="text" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Neuer Abschnitt..." className="flex-1 bg-slate-800 border border-slate-700 text-slate-100 rounded-xl px-4 py-3 focus:border-blue-500 outline-none" />
+                                <input type="number" step="0.5" min="0" value={newDuration} onChange={(e) => setNewDuration(e.target.value)} placeholder="Std." className="w-20 bg-slate-800 border border-slate-700 text-slate-100 rounded-xl px-3 py-3 focus:border-blue-500 outline-none text-center" />
+                                <button type="submit" disabled={!newTitle.trim()} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-4 sm:px-6 py-3 rounded-xl"><Icons.Plus /></button>
                             </div>
-                            <input type="text" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="Optionale Beschreibung / Notizen..." className="w-full bg-slate-800 border border-slate-700 text-slate-100 rounded-xl px-4 py-2 text-sm focus:border-emerald-500 outline-none" />
+                            <input type="text" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="Optionale Beschreibung / Notizen..." className="w-full bg-slate-800 border border-slate-700 text-slate-100 rounded-xl px-4 py-2 text-sm focus:border-blue-500 outline-none" />
                         </form>
                     </div>
                 </div>
@@ -318,6 +361,16 @@
             const [loading, setLoading] = useState(true);
             const [dbError, setDbError] = useState(null);
             const [forceOffline, setForceOffline] = useState(false);
+
+            // Hilfsfunktion zum Sortieren der Projekte (nach Dringlichkeit, dann Datum)
+            const sortProjects = (projList) => {
+                return [...projList].sort((a, b) => {
+                    const urgA = a.urgency || 3;
+                    const urgB = b.urgency || 3;
+                    if (urgA !== urgB) return urgA - urgB; // 1 = höchste Prio, also aufsteigend
+                    return b.createdAt - a.createdAt; // Neuerstes zuerst als Fallback
+                });
+            };
 
             // Register Service Worker for PWA Android Install
             useEffect(() => {
@@ -333,13 +386,10 @@
             // Lade Daten (entweder aus der Cloud oder lokal)
             useEffect(() => {
                 if (USE_CLOUD_SYNC && db && !forceOffline) {
-                    // Cloud Sync (Echtzeit)
                     const unsubscribe = db.collection('projects').onSnapshot(snapshot => {
-                        const cloudProjects = [];
+                        let cloudProjects = [];
                         snapshot.forEach(doc => cloudProjects.push({ id: doc.id, ...doc.data() }));
-                        // Sortieren: Neueste oben
-                        cloudProjects.sort((a, b) => b.createdAt - a.createdAt);
-                        setProjects(cloudProjects);
+                        setProjects(sortProjects(cloudProjects));
                         setDbError(null);
                         setLoading(false);
                     }, (error) => {
@@ -349,9 +399,10 @@
                     });
                     return () => unsubscribe();
                 } else {
-                    // Lokaler Speicher (Fallback ohne Sync)
                     const saved = localStorage.getItem('makerboard_projects');
-                    if (saved) setProjects(JSON.parse(saved));
+                    if (saved) {
+                        setProjects(sortProjects(JSON.parse(saved)));
+                    }
                     setLoading(false);
                 }
             }, [forceOffline]);
@@ -375,17 +426,18 @@
                 }
             };
 
-            const handleCreateProject = (name) => {
+            const handleCreateProject = (name, urgency) => {
                 const newProject = {
                     id: crypto.randomUUID(),
                     name: name,
+                    urgency: urgency,
                     createdAt: Date.now(),
                     sections: []
                 };
                 if (USE_CLOUD_SYNC && !forceOffline) {
                     saveProjectToCloud(newProject.id, newProject);
                 } else {
-                    setProjects(prev => [newProject, ...prev]);
+                    setProjects(prev => sortProjects([newProject, ...prev]));
                 }
             };
 
@@ -398,12 +450,12 @@
                 if (currentProjectId === id) setCurrentProjectId(null);
             };
 
-            const handleEditProject = (id, newName) => {
+            const handleEditProject = (id, updates) => {
                 const project = projects.find(p => p.id === id);
                 if (!project) return;
-                const updated = { ...project, name: newName };
+                const updated = { ...project, ...updates };
                 if (USE_CLOUD_SYNC && !forceOffline) saveProjectToCloud(id, updated);
-                else setProjects(prev => prev.map(p => p.id === id ? updated : p));
+                else setProjects(prev => sortProjects(prev.map(p => p.id === id ? updated : p)));
             };
 
             const handleAddSection = (projectId, title, duration, description) => {
@@ -459,7 +511,7 @@
                 else setProjects(prev => prev.map(p => p.id === projectId ? updated : p));
             };
 
-            if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div></div>;
+            if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div></div>;
 
             if (dbError) {
                 return (
@@ -469,7 +521,7 @@
                             <p className="mb-4 text-sm leading-relaxed">Dein Firebase-Projekt existiert, aber die eigentliche <b>Firestore Datenbank</b> wurde darin noch nicht erstellt.</p>
                             <div className="text-xs opacity-70 mb-6 bg-red-950 p-3 rounded text-left font-mono break-words max-h-32 overflow-y-auto">{dbError}</div>
                             <ol className="text-sm text-left list-decimal pl-5 space-y-2 text-slate-300">
-                                <li>Öffne die <b><a href="https://console.firebase.google.com/" target="_blank" rel="noreferrer" className="text-emerald-400 hover:text-emerald-300 underline">Firebase Konsole</a></b>.</li>
+                                <li>Öffne die <b><a href="https://console.firebase.google.com/" target="_blank" rel="noreferrer" className="text-blue-400 hover:text-blue-300 underline">Firebase Konsole</a></b>.</li>
                                 <li>Wähle dein Projekt.</li>
                                 <li>Gehe links im Menü auf <b>Firestore Database</b>.</li>
                                 <li>Klicke auf <b>Datenbank erstellen</b> und wähle <b>"Im Testmodus starten"</b>.</li>
