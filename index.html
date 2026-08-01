@@ -20,9 +20,9 @@
     <!-- Babel für JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Firebase (für den Cloud Sync) -->
-    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <!-- Firebase SDK (Version 8 - kompatibel mit unserem Code) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 </head>
 <body class="bg-slate-900 text-slate-100 font-sans selection:bg-emerald-500/30">
     <div id="root"></div>
@@ -39,13 +39,13 @@
         const USE_CLOUD_SYNC = true; 
         
         const firebaseConfig = {
-          apiKey: "AIzaSyCXDryC4C6ii9eacgtj_ALN_wsLxL-bwiw",
-          authDomain: "makerboard-488ad.firebaseapp.com",
-          projectId: "makerboard-488ad",
-          storageBucket: "makerboard-488ad.firebasestorage.app",
-          messagingSenderId: "663732219493",
-          appId: "1:663732219493:web:36e2b59cd6e7437213608c",
-          measurementId: "G-5JTLFGXR1V"
+  apiKey: "AIzaSyCXDryC4C6ii9eacgtj_ALN_wsLxL-bwiw",
+  authDomain: "makerboard-488ad.firebaseapp.com",
+  projectId: "makerboard-488ad",
+  storageBucket: "makerboard-488ad.firebasestorage.app",
+  messagingSenderId: "663732219493",
+  appId: "1:663732219493:web:36e2b59cd6e7437213608c",
+  measurementId: "G-5JTLFGXR1V"
         };
 
         let db = null;
@@ -316,10 +316,11 @@
             const [projects, setProjects] = useState([]);
             const [currentProjectId, setCurrentProjectId] = useState(null);
             const [loading, setLoading] = useState(true);
+            const [dbError, setDbError] = useState(null);
+            const [forceOffline, setForceOffline] = useState(false);
 
             // Register Service Worker for PWA Android Install
             useEffect(() => {
-                // Nur registrieren, wenn wir auf einer echten Webseite (http/https) sind
                 if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.protocol === 'http:')) {
                     navigator.serviceWorker.register('sw.js')
                         .then(reg => console.log('SW registriert'))
@@ -331,7 +332,7 @@
 
             // Lade Daten (entweder aus der Cloud oder lokal)
             useEffect(() => {
-                if (USE_CLOUD_SYNC && db) {
+                if (USE_CLOUD_SYNC && db && !forceOffline) {
                     // Cloud Sync (Echtzeit)
                     const unsubscribe = db.collection('projects').onSnapshot(snapshot => {
                         const cloudProjects = [];
@@ -339,6 +340,11 @@
                         // Sortieren: Neueste oben
                         cloudProjects.sort((a, b) => b.createdAt - a.createdAt);
                         setProjects(cloudProjects);
+                        setDbError(null);
+                        setLoading(false);
+                    }, (error) => {
+                        console.error("Firestore Fehler:", error);
+                        setDbError(error.message);
                         setLoading(false);
                     });
                     return () => unsubscribe();
@@ -348,23 +354,23 @@
                     if (saved) setProjects(JSON.parse(saved));
                     setLoading(false);
                 }
-            }, []);
+            }, [forceOffline]);
 
             // Speichern im Lokalen Speicher (wenn kein Cloud Sync aktiv ist)
             useEffect(() => {
-                if (!USE_CLOUD_SYNC && !loading) {
+                if ((!USE_CLOUD_SYNC || forceOffline) && !loading) {
                     localStorage.setItem('makerboard_projects', JSON.stringify(projects));
                 }
-            }, [projects, loading]);
+            }, [projects, loading, forceOffline]);
 
             // Helfer-Funktion zum Speichern
             const saveProjectToCloud = async (projectId, data) => {
-                if (USE_CLOUD_SYNC && db) {
+                if (USE_CLOUD_SYNC && db && !forceOffline) {
                     await db.collection('projects').doc(projectId).set(data);
                 }
             };
             const deleteProjectFromCloud = async (projectId) => {
-                if (USE_CLOUD_SYNC && db) {
+                if (USE_CLOUD_SYNC && db && !forceOffline) {
                     await db.collection('projects').doc(projectId).delete();
                 }
             };
@@ -376,7 +382,7 @@
                     createdAt: Date.now(),
                     sections: []
                 };
-                if (USE_CLOUD_SYNC) {
+                if (USE_CLOUD_SYNC && !forceOffline) {
                     saveProjectToCloud(newProject.id, newProject);
                 } else {
                     setProjects(prev => [newProject, ...prev]);
@@ -384,7 +390,7 @@
             };
 
             const handleDeleteProject = (id) => {
-                if (USE_CLOUD_SYNC) {
+                if (USE_CLOUD_SYNC && !forceOffline) {
                     deleteProjectFromCloud(id);
                 } else {
                     setProjects(prev => prev.filter(p => p.id !== id));
@@ -396,7 +402,7 @@
                 const project = projects.find(p => p.id === id);
                 if (!project) return;
                 const updated = { ...project, name: newName };
-                if (USE_CLOUD_SYNC) saveProjectToCloud(id, updated);
+                if (USE_CLOUD_SYNC && !forceOffline) saveProjectToCloud(id, updated);
                 else setProjects(prev => prev.map(p => p.id === id ? updated : p));
             };
 
@@ -406,7 +412,7 @@
                 const newSection = { id: crypto.randomUUID(), title, duration: duration || null, description: description || '', completed: false, createdAt: Date.now() };
                 const updated = { ...project, sections: [...(project.sections || []), newSection] };
                 
-                if (USE_CLOUD_SYNC) saveProjectToCloud(projectId, updated);
+                if (USE_CLOUD_SYNC && !forceOffline) saveProjectToCloud(projectId, updated);
                 else setProjects(prev => prev.map(p => p.id === projectId ? updated : p));
             };
 
@@ -415,7 +421,7 @@
                 if (!project) return;
                 const updated = { ...project, sections: project.sections.map(sec => sec.id === sectionId ? { ...sec, ...updates } : sec) };
                 
-                if (USE_CLOUD_SYNC) saveProjectToCloud(projectId, updated);
+                if (USE_CLOUD_SYNC && !forceOffline) saveProjectToCloud(projectId, updated);
                 else setProjects(prev => prev.map(p => p.id === projectId ? updated : p));
             };
 
@@ -424,7 +430,7 @@
                 if (!project) return;
                 const updated = { ...project, sections: project.sections.map(sec => sec.id === sectionId ? { ...sec, completed: isCompleted } : sec) };
                 
-                if (USE_CLOUD_SYNC) saveProjectToCloud(projectId, updated);
+                if (USE_CLOUD_SYNC && !forceOffline) saveProjectToCloud(projectId, updated);
                 else setProjects(prev => prev.map(p => p.id === projectId ? updated : p));
             };
 
@@ -433,7 +439,7 @@
                 if (!project) return;
                 const updated = { ...project, sections: project.sections.filter(sec => sec.id !== sectionId) };
                 
-                if (USE_CLOUD_SYNC) saveProjectToCloud(projectId, updated);
+                if (USE_CLOUD_SYNC && !forceOffline) saveProjectToCloud(projectId, updated);
                 else setProjects(prev => prev.map(p => p.id === projectId ? updated : p));
             };
 
@@ -449,11 +455,38 @@
                 newSections[newIndex] = temp;
                 const updated = { ...project, sections: newSections };
 
-                if (USE_CLOUD_SYNC) saveProjectToCloud(projectId, updated);
+                if (USE_CLOUD_SYNC && !forceOffline) saveProjectToCloud(projectId, updated);
                 else setProjects(prev => prev.map(p => p.id === projectId ? updated : p));
             };
 
             if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div></div>;
+
+            if (dbError) {
+                return (
+                    <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4">
+                        <div className="bg-red-900/30 border border-red-500/50 text-red-200 p-6 rounded-2xl max-w-md text-center shadow-xl mb-6">
+                            <h2 className="text-xl font-bold mb-3 text-red-400">Datenbank nicht gefunden</h2>
+                            <p className="mb-4 text-sm leading-relaxed">Dein Firebase-Projekt existiert, aber die eigentliche <b>Firestore Datenbank</b> wurde darin noch nicht erstellt.</p>
+                            <div className="text-xs opacity-70 mb-6 bg-red-950 p-3 rounded text-left font-mono break-words max-h-32 overflow-y-auto">{dbError}</div>
+                            <ol className="text-sm text-left list-decimal pl-5 space-y-2 text-slate-300">
+                                <li>Öffne die <b><a href="https://console.firebase.google.com/" target="_blank" rel="noreferrer" className="text-emerald-400 hover:text-emerald-300 underline">Firebase Konsole</a></b>.</li>
+                                <li>Wähle dein Projekt.</li>
+                                <li>Gehe links im Menü auf <b>Firestore Database</b>.</li>
+                                <li>Klicke auf <b>Datenbank erstellen</b> und wähle <b>"Im Testmodus starten"</b>.</li>
+                            </ol>
+                        </div>
+                        <button 
+                            onClick={() => {
+                                setDbError(null);
+                                setForceOffline(true);
+                            }}
+                            className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-6 py-3 rounded-xl transition-colors border border-slate-700 hover:border-slate-500 font-medium"
+                        >
+                            Trotzdem im Offline-Modus fortfahren
+                        </button>
+                    </div>
+                );
+            }
 
             const currentProject = projects.find(p => p.id === currentProjectId);
 
