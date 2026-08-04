@@ -7,33 +7,20 @@
     
     <meta name="theme-color" content="#3b82f6" />
     
-    <!-- PWA Setup (Standalone/Inline) -->
-    <script>
-        (function() {
-            // Dynamisches Manifest und Icon generieren, um 404-Fehler zu vermeiden
-            const svgIcon = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='100' fill='%233b82f6'/%3E%3Cpath d='M256 120L140 370h232z' fill='white'/%3E%3C/svg%3E`;
-            const manifest = {
-                name: "Makerboard",
-                short_name: "Makerboard",
-                start_url: window.location.href.split('?')[0],
-                display: "standalone",
-                background_color: "#0f172a",
-                theme_color: "#3b82f6",
-                icons: [{ src: svgIcon, sizes: "512x512", type: "image/svg+xml", purpose: "any maskable" }]
-            };
-            const manifestBlob = new Blob([JSON.stringify(manifest)], {type: 'application/manifest+json'});
-            
-            const link = document.createElement('link');
-            link.rel = 'manifest';
-            link.href = URL.createObjectURL(manifestBlob);
-            document.head.appendChild(link);
-            
-            const icon = document.createElement('link');
-            icon.rel = 'apple-touch-icon';
-            icon.href = svgIcon;
-            document.head.appendChild(icon);
-        })();
-    </script>
+    <!-- PWA Setup (Statische Data-URIs für 1-File-App) -->
+    <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Makerboard%22%2C%22short_name%22%3A%22Makerboard%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230f172a%22%2C%22theme_color%22%3A%22%233b82f6%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%20512%20512%27%253E%253Crect%20width%3D%27512%27%20height%3D%27512%27%20rx%3D%27100%27%20fill%3D%27%25233b82f6%27%2F%253E%253Cpath%20d%3D%27M256%20120L140%20370h232z%27%20fill%3D%27white%27%2F%253E%253C%2Fsvg%253E%22%2C%22sizes%22%3A%22512x512%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%2C%22purpose%22%3A%22any%20maskable%22%7D%5D%7D" />
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='100' fill='%233b82f6'/%3E%3Cpath d='M256 120L140 370h232z' fill='white'/%3E%3C/svg%3E" />
+    
+    <style>
+        /* Bulletproof CSS-Reset für korrekte App-Höhe auf mobilen Geräten */
+        html, body, #root {
+            height: 100%;
+            height: 100dvh;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Scrollen des Bodys komplett verhindern! WICHTIG! */
+        }
+    </style>
     
     <!-- Tailwind CSS laden -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -129,10 +116,10 @@
             };
 
             return (
-                <div className="max-w-3xl mx-auto p-4 sm:p-6">
-                    <header className="mb-8 mt-4">
-                        <h1 className="text-3xl font-bold text-blue-500 tracking-tight">Makerboard</h1>
-                        <p className="text-slate-400 mt-2">Mein Maker-Projekte Manager.</p>
+                <div className="h-full flex flex-col w-full max-w-3xl mx-auto">
+                    <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-20">
+                        <header className="mb-8 mt-4">
+                            <h1 className="text-3xl font-bold text-blue-500 tracking-tight">Makerboard</h1>
                         {!USE_CLOUD_SYNC && (
                             <div className="mt-4 p-3 bg-amber-900/40 border border-amber-500/30 text-amber-200 text-sm rounded-lg">
                                 <strong>Hinweis:</strong> Offline-Modus aktiv. Deine Daten bleiben auf diesem Gerät. Für einen Abgleich zum Handy musst du Firebase einrichten (siehe Code).
@@ -257,6 +244,7 @@
                             })
                         )}
                     </div>
+                    </div>
                 </div>
             );
         };
@@ -291,7 +279,7 @@
             const totalHours = sections.reduce((sum, sec) => sum + (parseFloat(sec.duration) || 0), 0);
 
             return (
-                <div className="fixed inset-0 bg-slate-900 flex flex-col w-full h-full overflow-hidden">
+                <div className="h-full flex flex-col w-full bg-slate-900">
                     <div className="flex flex-col w-full max-w-3xl mx-auto h-full relative">
                         <header className="shrink-0 flex items-center gap-4 p-4 sm:p-6 pb-4 border-b border-slate-800">
                             <button onClick={onBack} className="p-2 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-full shrink-0">
@@ -399,17 +387,11 @@
                 });
             };
 
-            // Register Service Worker for PWA Android Install
+            // Register Service Worker (für 1-File-App deaktiviert)
             useEffect(() => {
-                if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.protocol === 'http:')) {
-                    // Verwende einen inline Service Worker, damit Android nicht auf eine fehlende sw.js wartet
-                    const swCode = `self.addEventListener('fetch', function(e) { /* Dummy Fetch für PWA */ });`;
-                    const blob = new Blob([swCode], { type: 'application/javascript' });
-                    
-                    navigator.serviceWorker.register(URL.createObjectURL(blob))
-                        .then(reg => console.log('SW registriert (Inline)'))
-                        .catch(err => console.error('SW Fehler:', err));
-                }
+                // Info: Chrome erlaubt "Zum Startbildschirm hinzufügen" auch ohne ServiceWorker!
+                // Es erstellt die gleiche Standalone-App wie eine volle Installation (Vollbild, kein Browser-Rahmen).
+                // Ein virtueller ServiceWorker (Blob) wird oft von Android blockiert, deshalb lassen wir ihn weg.
             }, []);
 
             // Lade Daten (entweder aus der Cloud oder lokal)
@@ -572,7 +554,7 @@
             const currentProject = projects.find(p => p.id === currentProjectId);
 
             return (
-                <div>
+                <div className="h-full w-full">
                     {currentProjectId && currentProject ? (
                         <ProjectTimeline project={currentProject} onBack={() => setCurrentProjectId(null)} onAddSection={handleAddSection} onToggleSection={handleToggleSection} onDeleteSection={handleDeleteSection} onEditSection={handleEditSection} onMoveSection={handleMoveSection} />
                     ) : (
