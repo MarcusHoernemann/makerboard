@@ -2,23 +2,75 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" />
     <title>Makerboard</title>
     
-    <meta name="theme-color" content="#3b82f6" />
+    <meta name="theme-color" content="#0f172a" />
     
-    <!-- PWA Setup (Statische Data-URIs für 1-File-App) -->
-    <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Makerboard%22%2C%22short_name%22%3A%22Makerboard%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230f172a%22%2C%22theme_color%22%3A%22%233b82f6%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%20512%20512%27%253E%253Crect%20width%3D%27512%27%20height%3D%27512%27%20rx%3D%27100%27%20fill%3D%27%25233b82f6%27%2F%253E%253Cpath%20d%3D%27M256%20120L140%20370h232z%27%20fill%3D%27white%27%2F%253E%253C%2Fsvg%253E%22%2C%22sizes%22%3A%22512x512%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%2C%22purpose%22%3A%22any%20maskable%22%7D%5D%7D" />
-    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='100' fill='%233b82f6'/%3E%3Cpath d='M256 120L140 370h232z' fill='white'/%3E%3C/svg%3E" />
+    <!-- PWA & Logo Setup: Erzeugt virtuelle Dateien im Speicher, damit Android die Installation erlaubt -->
+    <script>
+        // Unser blaues Makerboard Logo als SVG
+        const svgIcon = encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='#3b82f6'/><path d='M256 120L140 370h232z' fill='white'/></svg>`);
+        const iconUrl = `data:image/svg+xml;charset=utf-8,${svgIcon}`;
+        
+        // Manifest generieren (inkl. 192x192 und 512x512 Größen, die Android fordert)
+        const manifest = {
+            name: "Makerboard",
+            short_name: "Makerboard",
+            start_url: window.location.pathname,
+            display: "standalone",
+            background_color: "#0f172a",
+            theme_color: "#3b82f6",
+            icons: [
+                { src: iconUrl, sizes: "192x192", type: "image/svg+xml", purpose: "any maskable" },
+                { src: iconUrl, sizes: "512x512", type: "image/svg+xml", purpose: "any maskable" }
+            ]
+        };
+        const manifestBlob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
+        const manifestUrl = URL.createObjectURL(manifestBlob);
+        
+        document.write(`<link rel="manifest" href="${manifestUrl}">`);
+        document.write(`<link rel="apple-touch-icon" href="${iconUrl}">`);
+        
+        // Dummy Service Worker generieren, um die Android-Installations-Anforderung zu befriedigen
+        if ('serviceWorker' in navigator) {
+            const swCode = `
+                self.addEventListener('install', e => self.skipWaiting());
+                self.addEventListener('activate', e => self.clients.claim());
+                self.addEventListener('fetch', e => {});
+            `;
+            const swBlob = new Blob([swCode], {type: 'application/javascript'});
+            const swUrl = URL.createObjectURL(swBlob);
+            navigator.serviceWorker.register(swUrl).catch(err => console.log('SW Info:', err));
+        }
+
+        // --- DER ABSOLUTE LAYOUT FIX FÜR MOBILE BROWSER ---
+        // Misst die exakte Bildschirmhöhe (ohne Browser-Menüleisten) und schreibt sie in eine CSS-Variable
+        function setAppHeight() {
+            document.documentElement.style.setProperty('--app-height', `${window.innerHeight}px`);
+        }
+        window.addEventListener('resize', setAppHeight);
+        window.addEventListener('orientationchange', setAppHeight);
+        setAppHeight();
+    </script>
     
     <style>
-        /* Bulletproof CSS-Reset für korrekte App-Höhe auf mobilen Geräten */
-        html, body, #root {
-            height: 100%;
-            height: 100dvh;
+        /* Verankert die App unbeweglich im exakt sichtbaren Bildschirmbereich */
+        html, body {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            width: 100%;
+            height: var(--app-height, 100vh);
+            overflow: hidden; /* Verhindert das versehentliche Scrollen der ganzen Seite */
             margin: 0;
             padding: 0;
-            overflow: hidden; /* Scrollen des Bodys komplett verhindern! WICHTIG! */
+            background-color: #0f172a;
+        }
+        #root {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
         }
     </style>
     
@@ -32,19 +84,16 @@
     <!-- Babel für JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Firebase SDK (Version 8 - kompatibel mit unserem Code) -->
+    <!-- Firebase SDK (Version 8) -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 </head>
-<body class="bg-slate-900 text-slate-100 font-sans selection:bg-blue-500/30">
+<body class="text-slate-100 font-sans selection:bg-blue-500/30">
     <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // =========================================================================
-        // CLOUD SYNC EINSTELLUNGEN
-        // =========================================================================
         const USE_CLOUD_SYNC = true; 
         
         const firebaseConfig = {
@@ -77,7 +126,6 @@
             Flag: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg>
         };
 
-        // Konfiguration der Dringlichkeitsstufen
         const URGENCY_LEVELS = {
             1: { label: 'Priorität 1', colorClass: 'text-red-400', bgClass: 'bg-red-400/10 border-red-400/20' },
             2: { label: 'Priorität 2', colorClass: 'text-orange-400', bgClass: 'bg-orange-400/10 border-orange-400/20' },
@@ -116,134 +164,114 @@
             };
 
             return (
-                <div className="h-full flex flex-col w-full max-w-3xl mx-auto">
-                    <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-20">
+                <div className="flex-1 flex flex-col w-full max-w-3xl mx-auto min-h-0 relative">
+                    <div className="flex-1 overflow-y-auto min-h-0 p-4 sm:p-6 pb-20">
                         <header className="mb-8 mt-4">
                             <h1 className="text-3xl font-bold text-blue-500 tracking-tight">Makerboard</h1>
-                        {!USE_CLOUD_SYNC && (
-                            <div className="mt-4 p-3 bg-amber-900/40 border border-amber-500/30 text-amber-200 text-sm rounded-lg">
-                                <strong>Hinweis:</strong> Offline-Modus aktiv. Deine Daten bleiben auf diesem Gerät. Für einen Abgleich zum Handy musst du Firebase einrichten (siehe Code).
-                            </div>
-                        )}
-                    </header>
+                            {!USE_CLOUD_SYNC && (
+                                <div className="mt-4 p-3 bg-amber-900/40 border border-amber-500/30 text-amber-200 text-sm rounded-lg">
+                                    <strong>Hinweis:</strong> Offline-Modus aktiv. Deine Daten bleiben auf diesem Gerät. Für einen Abgleich zum Handy musst du Firebase einrichten.
+                                </div>
+                            )}
+                        </header>
 
-                    <form onSubmit={handleCreate} className="mb-8 flex flex-col sm:flex-row gap-3">
-                        <input
-                            type="text"
-                            value={newProjectName}
-                            onChange={(e) => setNewProjectName(e.target.value)}
-                            placeholder="Neues Projekt (z.B. Roboterarm)..."
-                            className="flex-1 bg-slate-800 border border-slate-700 text-slate-100 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-                        />
-                        <select
-                            value={newProjectUrgency}
-                            onChange={(e) => setNewProjectUrgency(Number(e.target.value))}
-                            className="bg-slate-800 border border-slate-700 text-slate-100 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all cursor-pointer"
-                        >
-                            {Object.entries(URGENCY_LEVELS).map(([key, config]) => (
-                                <option key={key} value={key}>{config.label}</option>
-                            ))}
-                        </select>
-                        <button
-                            type="submit"
-                            disabled={!newProjectName.trim()}
-                            className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-5 py-3 rounded-xl font-medium flex items-center justify-center gap-2 transition-colors shadow-lg shadow-blue-900/20"
-                        >
-                            <Icons.Plus /> <span className="hidden sm:inline">Erstellen</span>
-                        </button>
-                    </form>
+                        <form onSubmit={handleCreate} className="mb-8 flex flex-col sm:flex-row gap-3">
+                            <input
+                                type="text"
+                                value={newProjectName}
+                                onChange={(e) => setNewProjectName(e.target.value)}
+                                placeholder="Neues Projekt (z.B. Roboterarm)..."
+                                className="flex-1 bg-slate-800 border border-slate-700 text-slate-100 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 transition-all"
+                            />
+                            <select
+                                value={newProjectUrgency}
+                                onChange={(e) => setNewProjectUrgency(Number(e.target.value))}
+                                className="bg-slate-800 border border-slate-700 text-slate-100 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 transition-all cursor-pointer"
+                            >
+                                {Object.entries(URGENCY_LEVELS).map(([key, config]) => (
+                                    <option key={key} value={key}>{config.label}</option>
+                                ))}
+                            </select>
+                            <button
+                                type="submit"
+                                disabled={!newProjectName.trim()}
+                                className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-5 py-3 rounded-xl font-medium flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20"
+                            >
+                                <Icons.Plus /> <span className="hidden sm:inline">Erstellen</span>
+                            </button>
+                        </form>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {projects.length === 0 ? (
-                            <div className="col-span-full text-center py-12 text-slate-500 bg-slate-800/50 rounded-2xl border border-slate-800">
-                                Noch keine Projekte angelegt. Starte dein erstes Projekt!
-                            </div>
-                        ) : (
-                            projects.map(project => {
-                                const total = project.sections?.length || 0;
-                                const completed = project.sections?.filter(s => s.completed).length || 0;
-                                const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
-                                const isCompleted = total > 0 && progress === 100;
-                                const currentUrgency = project.urgency || 3;
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {projects.length === 0 ? (
+                                <div className="col-span-full text-center py-12 text-slate-500 bg-slate-800/50 rounded-2xl border border-slate-800">
+                                    Noch keine Projekte angelegt. Starte dein erstes Projekt!
+                                </div>
+                            ) : (
+                                projects.map(project => {
+                                    const total = project.sections?.length || 0;
+                                    const completed = project.sections?.filter(s => s.completed).length || 0;
+                                    const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
+                                    const isCompleted = total > 0 && progress === 100;
+                                    const currentUrgency = project.urgency || 3;
 
-                                return (
-                                    <div 
-                                        key={project.id} 
-                                        onClick={() => { if(editingId !== project.id) onOpenProject(project); }}
-                                        className={`border p-5 rounded-2xl cursor-pointer hover:shadow-xl transition-all group relative ${
-                                            isCompleted 
-                                                ? 'bg-blue-900/10 border-blue-500/30 hover:border-blue-400' 
-                                                : 'bg-slate-800 border-slate-700 hover:border-blue-500'
-                                        }`}
-                                    >
-                                        <div className="flex justify-between items-start mb-4">
-                                            {editingId === project.id ? (
-                                                <div className="flex flex-col gap-3 w-full pr-8" onClick={e => e.stopPropagation()}>
-                                                    <input 
-                                                        type="text" 
-                                                        value={editName}
-                                                        autoFocus
-                                                        onChange={(e) => setEditName(e.target.value)}
-                                                        className="text-lg font-semibold bg-slate-900 text-slate-100 border border-blue-500 rounded px-3 py-2 w-full focus:outline-none"
-                                                    />
-                                                    <select 
-                                                        value={editUrgency}
-                                                        onChange={(e) => setEditUrgency(Number(e.target.value))}
-                                                        className="bg-slate-900 text-slate-100 border border-slate-700 rounded px-3 py-2 w-full focus:outline-none focus:border-blue-500 text-sm"
-                                                    >
-                                                        {Object.entries(URGENCY_LEVELS).map(([key, config]) => (
-                                                            <option key={key} value={key}>{config.label}</option>
-                                                        ))}
-                                                    </select>
-                                                    <div className="flex gap-2">
-                                                        <button onClick={() => saveEditing(project.id)} className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 text-white rounded font-medium">Speichern</button>
-                                                        <button onClick={() => setEditingId(null)} className="px-3 py-1.5 text-sm bg-slate-700 hover:bg-slate-600 text-slate-200 rounded">Abbrechen</button>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <>
-                                                    <div className="flex flex-col gap-2 pr-12">
-                                                        <h2 className="text-xl font-semibold text-slate-100 flex items-center gap-3 flex-wrap">
-                                                            {project.name}
-                                                            {isCompleted && (
-                                                                <span className="text-xs font-bold uppercase tracking-wider bg-blue-500 text-slate-900 px-2 py-1 rounded-md">Fertig</span>
-                                                            )}
-                                                        </h2>
-                                                        <div className={`inline-flex w-max items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${URGENCY_LEVELS[currentUrgency].bgClass} ${URGENCY_LEVELS[currentUrgency].colorClass}`}>
-                                                            <Icons.Flag /> {URGENCY_LEVELS[currentUrgency].label}
+                                    return (
+                                        <div 
+                                            key={project.id} 
+                                            onClick={() => { if(editingId !== project.id) onOpenProject(project); }}
+                                            className={`border p-5 rounded-2xl cursor-pointer hover:shadow-xl transition-all group relative ${
+                                                isCompleted ? 'bg-blue-900/10 border-blue-500/30' : 'bg-slate-800 border-slate-700'
+                                            }`}
+                                        >
+                                            <div className="flex justify-between items-start mb-4">
+                                                {editingId === project.id ? (
+                                                    <div className="flex flex-col gap-3 w-full pr-8" onClick={e => e.stopPropagation()}>
+                                                        <input 
+                                                            type="text" value={editName} autoFocus onChange={(e) => setEditName(e.target.value)}
+                                                            className="text-lg font-semibold bg-slate-900 text-slate-100 border border-blue-500 rounded px-3 py-2 w-full focus:outline-none"
+                                                        />
+                                                        <select 
+                                                            value={editUrgency} onChange={(e) => setEditUrgency(Number(e.target.value))}
+                                                            className="bg-slate-900 text-slate-100 border border-slate-700 rounded px-3 py-2 w-full focus:outline-none focus:border-blue-500 text-sm"
+                                                        >
+                                                            {Object.entries(URGENCY_LEVELS).map(([key, config]) => (
+                                                                <option key={key} value={key}>{config.label}</option>
+                                                            ))}
+                                                        </select>
+                                                        <div className="flex gap-2">
+                                                            <button onClick={() => saveEditing(project.id)} className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 text-white rounded font-medium">Speichern</button>
+                                                            <button onClick={() => setEditingId(null)} className="px-3 py-1.5 text-sm bg-slate-700 hover:bg-slate-600 text-slate-200 rounded">Abbrechen</button>
                                                         </div>
                                                     </div>
-                                                    
-                                                    <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <button 
-                                                            onClick={(e) => { e.stopPropagation(); startEditing(project); }}
-                                                            className="text-slate-500 hover:text-blue-400 p-2 bg-slate-800/80 rounded-lg backdrop-blur-sm"
-                                                        >
-                                                            <Icons.Edit />
-                                                        </button>
-                                                        <button 
-                                                            onClick={(e) => { e.stopPropagation(); onDeleteProject(project.id); }}
-                                                            className="text-slate-500 hover:text-red-400 p-2 bg-slate-800/80 rounded-lg backdrop-blur-sm"
-                                                        >
-                                                            <Icons.Trash />
-                                                        </button>
-                                                    </div>
-                                                </>
-                                            )}
+                                                ) : (
+                                                    <>
+                                                        <div className="flex flex-col gap-2 pr-12">
+                                                            <h2 className="text-xl font-semibold text-slate-100 flex items-center gap-3 flex-wrap">
+                                                                {project.name}
+                                                                {isCompleted && <span className="text-xs font-bold uppercase bg-blue-500 text-slate-900 px-2 py-1 rounded-md">Fertig</span>}
+                                                            </h2>
+                                                            <div className={`inline-flex w-max items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${URGENCY_LEVELS[currentUrgency].bgClass} ${URGENCY_LEVELS[currentUrgency].colorClass}`}>
+                                                                <Icons.Flag /> {URGENCY_LEVELS[currentUrgency].label}
+                                                            </div>
+                                                        </div>
+                                                        <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <button onClick={(e) => { e.stopPropagation(); startEditing(project); }} className="text-slate-500 hover:text-blue-400 p-2"><Icons.Edit /></button>
+                                                            <button onClick={(e) => { e.stopPropagation(); onDeleteProject(project.id); }} className="text-slate-500 hover:text-red-400 p-2"><Icons.Trash /></button>
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+                                            <div className="flex justify-between text-sm text-slate-400 mb-2">
+                                                <span>{completed} von {total} Abschnitten</span>
+                                                <span>{progress}%</span>
+                                            </div>
+                                            <div className="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden">
+                                                <div className="bg-blue-500 h-2.5 rounded-full transition-all" style={{ width: `${progress}%` }}></div>
+                                            </div>
                                         </div>
-                                        
-                                        <div className="flex justify-between text-sm text-slate-400 mb-2">
-                                            <span>{completed} von {total} Abschnitten</span>
-                                            <span>{progress}%</span>
-                                        </div>
-                                        <div className="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden">
-                                            <div className="bg-blue-500 h-2.5 rounded-full transition-all" style={{ width: `${progress}%` }}></div>
-                                        </div>
-                                    </div>
-                                );
-                            })
-                        )}
-                    </div>
+                                    );
+                                })
+                            )}
+                        </div>
                     </div>
                 </div>
             );
@@ -279,92 +307,92 @@
             const totalHours = sections.reduce((sum, sec) => sum + (parseFloat(sec.duration) || 0), 0);
 
             return (
-                <div className="h-full flex flex-col w-full bg-slate-900">
-                    <div className="flex flex-col w-full max-w-3xl mx-auto h-full relative">
-                        <header className="shrink-0 flex items-center gap-4 p-4 sm:p-6 pb-4 border-b border-slate-800">
-                            <button onClick={onBack} className="p-2 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-full shrink-0">
-                                <Icons.ArrowLeft />
-                            </button>
-                            <div className="flex-1 min-w-0">
-                                <h1 className="text-2xl sm:text-3xl font-bold text-slate-100 truncate">{project.name}</h1>
-                                {totalHours > 0 && (
-                                    <div className="flex items-center gap-1 text-slate-400 mt-1 text-sm">
-                                        <Icons.Clock /> Gesamtzeit: ~{totalHours} Stunden
-                                    </div>
-                                )}
-                            </div>
-                        </header>
-
-                        <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-6">
-                            {sections.length === 0 ? (
-                                <div className="text-center py-12 text-slate-500">
-                                    Füge deinen ersten Projekt-Abschnitt hinzu.
-                                </div>
-                            ) : (
-                                <div className="relative pl-6 sm:pl-8">
-                                    <div className="absolute left-10 sm:left-12 top-6 bottom-6 w-0.5 bg-slate-700"></div>
-                                    <ul className="space-y-4 relative z-10">
-                                        {sections.map((section, index) => (
-                                            <li key={section.id} className="flex items-center gap-4 sm:gap-6 group">
-                                                <button 
-                                                    onClick={() => onToggleSection(project.id, section.id, !section.completed)}
-                                                    className={`shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all duration-300 relative z-10 shadow-lg ${
-                                                        section.completed ? 'bg-blue-500 border-blue-500 text-slate-900 shadow-blue-500/30' : 'bg-slate-900 border-slate-500 text-transparent'
-                                                    }`}
-                                                >
-                                                    <Icons.Check />
-                                                </button>
-
-                                                <div className={`flex-1 p-4 rounded-2xl border transition-all ${
-                                                    section.completed ? 'bg-slate-800/40 border-slate-700/50 opacity-60' : 'bg-slate-800 border-slate-600 shadow-md'
-                                                }`}>
-                                                    {editingId === section.id ? (
-                                                        <div className="flex flex-col gap-3">
-                                                            <div className="flex gap-2">
-                                                                <input type="text" value={editData.title} onChange={e => setEditData({...editData, title: e.target.value})} className="flex-1 bg-slate-900 border border-slate-700 text-slate-100 rounded-lg px-3 py-2 focus:border-blue-500 outline-none" placeholder="Titel"/>
-                                                                <input type="number" step="0.5" min="0" value={editData.duration} onChange={e => setEditData({...editData, duration: e.target.value})} className="w-20 bg-slate-900 border border-slate-700 text-slate-100 rounded-lg px-3 py-2 text-center focus:border-blue-500 outline-none" placeholder="Std."/>
-                                                            </div>
-                                                            <textarea value={editData.description} onChange={e => setEditData({...editData, description: e.target.value})} className="w-full bg-slate-900 border border-slate-700 text-slate-100 rounded-lg px-3 py-2 text-sm focus:border-blue-500 outline-none" placeholder="Beschreibung..." rows="2"></textarea>
-                                                            <div className="flex gap-2 justify-end">
-                                                                <button onClick={() => setEditingId(null)} className="px-3 py-1.5 text-sm text-slate-400">Abbrechen</button>
-                                                                <button onClick={() => handleSaveEdit(section.id)} className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 text-white rounded-lg">Speichern</button>
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="flex justify-between items-start">
-                                                            <div className="flex flex-col">
-                                                                <span className={`text-lg font-medium transition-all ${section.completed ? 'line-through text-slate-500' : 'text-slate-100'}`}>
-                                                                    {section.title}
-                                                                </span>
-                                                                {section.duration && <span className="text-xs text-slate-400 mt-1 flex items-center gap-1"><Icons.Clock /> {section.duration} Std.</span>}
-                                                                {section.description && <p className="text-sm text-slate-400 mt-2 whitespace-pre-wrap leading-relaxed">{section.description}</p>}
-                                                            </div>
-                                                            <div className="flex flex-col sm:flex-row gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity ml-4 shrink-0">
-                                                                <button onClick={(e) => { e.stopPropagation(); onMoveSection(project.id, index, -1); }} disabled={index === 0} className="text-slate-500 hover:text-blue-400 disabled:opacity-20 p-2"><Icons.ArrowUp /></button>
-                                                                <button onClick={(e) => { e.stopPropagation(); onMoveSection(project.id, index, 1); }} disabled={index === sections.length - 1} className="text-slate-500 hover:text-blue-400 disabled:opacity-20 p-2"><Icons.ArrowDown /></button>
-                                                                <button onClick={() => { setEditingId(section.id); setEditData({ title: section.title, duration: section.duration || '', description: section.description || '' }); }} className="text-slate-500 hover:text-blue-400 p-2"><Icons.Edit /></button>
-                                                                <button onClick={() => onDeleteSection(project.id, section.id)} className="text-slate-500 hover:text-red-400 p-2"><Icons.Trash /></button>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </li>
-                                        ))}
-                                    </ul>
+                <div className="flex-1 flex flex-col w-full max-w-3xl mx-auto min-h-0 relative">
+                    <header className="shrink-0 flex items-center gap-4 p-4 sm:p-6 pb-4 border-b border-slate-800">
+                        <button onClick={onBack} className="p-2 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-full shrink-0">
+                            <Icons.ArrowLeft />
+                        </button>
+                        <div className="flex-1 min-w-0">
+                            <h1 className="text-2xl sm:text-3xl font-bold text-slate-100 truncate">{project.name}</h1>
+                            {totalHours > 0 && (
+                                <div className="flex items-center gap-1 text-slate-400 mt-1 text-sm">
+                                    <Icons.Clock /> Gesamtzeit: ~{totalHours} Stunden
                                 </div>
                             )}
                         </div>
+                    </header>
 
-                        <div className="shrink-0 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-slate-900 border-t border-slate-800 z-50">
-                            <form onSubmit={handleAdd} className="flex flex-col gap-2">
-                                <div className="flex gap-2 sm:gap-3">
-                                    <input type="text" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Neuer Abschnitt..." className="flex-1 bg-slate-800 border border-slate-700 text-slate-100 rounded-xl px-4 py-3 focus:border-blue-500 outline-none text-base" />
-                                    <input type="number" step="0.5" min="0" value={newDuration} onChange={(e) => setNewDuration(e.target.value)} placeholder="Std." className="w-20 bg-slate-800 border border-slate-700 text-slate-100 rounded-xl px-3 py-3 focus:border-blue-500 outline-none text-center text-base" />
-                                    <button type="submit" disabled={!newTitle.trim()} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-4 sm:px-6 py-3 rounded-xl shrink-0"><Icons.Plus /></button>
-                                </div>
-                                <input type="text" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="Optionale Beschreibung / Notizen..." className="w-full bg-slate-800 border border-slate-700 text-slate-100 rounded-xl px-4 py-2 text-base focus:border-blue-500 outline-none" />
-                            </form>
-                        </div>
+                    {/* Flex-1 und min-h-0 sorgen dafür, dass NUR dieser Bereich scrollt und der Formular-Bereich unten fix bleibt */}
+                    <div className="flex-1 overflow-y-auto min-h-0 p-4 sm:p-6">
+                        {sections.length === 0 ? (
+                            <div className="text-center py-12 text-slate-500">
+                                Füge deinen ersten Projekt-Abschnitt hinzu.
+                            </div>
+                        ) : (
+                            <div className="relative pl-6 sm:pl-8 pb-12">
+                                <div className="absolute left-10 sm:left-12 top-6 bottom-6 w-0.5 bg-slate-700"></div>
+                                <ul className="space-y-4 relative z-10">
+                                    {sections.map((section, index) => (
+                                        <li key={section.id} className="flex items-center gap-4 sm:gap-6 group">
+                                            <button 
+                                                onClick={() => onToggleSection(project.id, section.id, !section.completed)}
+                                                className={`shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all duration-300 relative z-10 shadow-lg ${
+                                                    section.completed ? 'bg-blue-500 border-blue-500 text-slate-900 shadow-blue-500/30' : 'bg-slate-900 border-slate-500 text-transparent'
+                                                }`}
+                                            >
+                                                <Icons.Check />
+                                            </button>
+
+                                            <div className={`flex-1 p-4 rounded-2xl border transition-all ${
+                                                section.completed ? 'bg-slate-800/40 border-slate-700/50 opacity-60' : 'bg-slate-800 border-slate-600 shadow-md'
+                                            }`}>
+                                                {editingId === section.id ? (
+                                                    <div className="flex flex-col gap-3">
+                                                        <div className="flex gap-2">
+                                                            <input type="text" value={editData.title} onChange={e => setEditData({...editData, title: e.target.value})} className="flex-1 min-w-0 bg-slate-900 border border-slate-700 text-slate-100 rounded-lg px-3 py-2 focus:border-blue-500 outline-none" placeholder="Titel"/>
+                                                            <input type="number" step="0.5" min="0" value={editData.duration} onChange={e => setEditData({...editData, duration: e.target.value})} className="w-16 sm:w-20 shrink-0 bg-slate-900 border border-slate-700 text-slate-100 rounded-lg px-2 sm:px-3 py-2 text-center focus:border-blue-500 outline-none" placeholder="Std."/>
+                                                        </div>
+                                                        <textarea value={editData.description} onChange={e => setEditData({...editData, description: e.target.value})} className="w-full bg-slate-900 border border-slate-700 text-slate-100 rounded-lg px-3 py-2 text-sm focus:border-blue-500 outline-none" placeholder="Beschreibung..." rows="2"></textarea>
+                                                        <div className="flex gap-2 justify-end">
+                                                            <button onClick={() => setEditingId(null)} className="px-3 py-1.5 text-sm text-slate-400">Abbrechen</button>
+                                                            <button onClick={() => handleSaveEdit(section.id)} className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 text-white rounded-lg">Speichern</button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex justify-between items-start">
+                                                        <div className="flex flex-col">
+                                                            <span className={`text-lg font-medium transition-all ${section.completed ? 'line-through text-slate-500' : 'text-slate-100'}`}>
+                                                                {section.title}
+                                                            </span>
+                                                            {section.duration && <span className="text-xs text-slate-400 mt-1 flex items-center gap-1"><Icons.Clock /> {section.duration} Std.</span>}
+                                                            {section.description && <p className="text-sm text-slate-400 mt-2 whitespace-pre-wrap leading-relaxed">{section.description}</p>}
+                                                        </div>
+                                                        <div className="flex flex-col sm:flex-row gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity ml-4 shrink-0">
+                                                            <button onClick={(e) => { e.stopPropagation(); onMoveSection(project.id, index, -1); }} disabled={index === 0} className="text-slate-500 hover:text-blue-400 disabled:opacity-20 p-2"><Icons.ArrowUp /></button>
+                                                            <button onClick={(e) => { e.stopPropagation(); onMoveSection(project.id, index, 1); }} disabled={index === sections.length - 1} className="text-slate-500 hover:text-blue-400 disabled:opacity-20 p-2"><Icons.ArrowDown /></button>
+                                                            <button onClick={() => { setEditingId(section.id); setEditData({ title: section.title, duration: section.duration || '', description: section.description || '' }); }} className="text-slate-500 hover:text-blue-400 p-2"><Icons.Edit /></button>
+                                                            <button onClick={() => onDeleteSection(project.id, section.id)} className="text-slate-500 hover:text-red-400 p-2"><Icons.Trash /></button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Dieser Container ist fest im Layout unten (shrink-0), kann also nie verschwinden */}
+                    <div className="shrink-0 p-4 border-t border-slate-800 bg-slate-900">
+                        <form onSubmit={handleAdd} className="flex flex-col gap-2">
+                            <div className="flex gap-2 sm:gap-3">
+                                <input type="text" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Neuer Abschnitt..." className="flex-1 min-w-0 bg-slate-800 border border-slate-700 text-slate-100 rounded-xl px-3 sm:px-4 py-3 focus:border-blue-500 outline-none text-base" />
+                                <input type="number" step="0.5" min="0" value={newDuration} onChange={(e) => setNewDuration(e.target.value)} placeholder="Std." className="w-16 sm:w-20 shrink-0 bg-slate-800 border border-slate-700 text-slate-100 rounded-xl px-2 sm:px-3 py-3 focus:border-blue-500 outline-none text-center text-base" />
+                                <button type="submit" disabled={!newTitle.trim()} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-4 sm:px-6 py-3 rounded-xl shrink-0"><Icons.Plus /></button>
+                            </div>
+                            <input type="text" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="Optionale Beschreibung / Notizen..." className="w-full bg-slate-800 border border-slate-700 text-slate-100 rounded-xl px-4 py-2 text-base focus:border-blue-500 outline-none" />
+                        </form>
                     </div>
                 </div>
             );
@@ -377,24 +405,15 @@
             const [dbError, setDbError] = useState(null);
             const [forceOffline, setForceOffline] = useState(false);
 
-            // Hilfsfunktion zum Sortieren der Projekte (nach Dringlichkeit, dann Datum)
             const sortProjects = (projList) => {
                 return [...projList].sort((a, b) => {
                     const urgA = a.urgency || 3;
                     const urgB = b.urgency || 3;
-                    if (urgA !== urgB) return urgA - urgB; // 1 = höchste Prio, also aufsteigend
-                    return b.createdAt - a.createdAt; // Neuerstes zuerst als Fallback
+                    if (urgA !== urgB) return urgA - urgB;
+                    return b.createdAt - a.createdAt;
                 });
             };
 
-            // Register Service Worker (für 1-File-App deaktiviert)
-            useEffect(() => {
-                // Info: Chrome erlaubt "Zum Startbildschirm hinzufügen" auch ohne ServiceWorker!
-                // Es erstellt die gleiche Standalone-App wie eine volle Installation (Vollbild, kein Browser-Rahmen).
-                // Ein virtueller ServiceWorker (Blob) wird oft von Android blockiert, deshalb lassen wir ihn weg.
-            }, []);
-
-            // Lade Daten (entweder aus der Cloud oder lokal)
             useEffect(() => {
                 if (USE_CLOUD_SYNC && db && !forceOffline) {
                     const unsubscribe = db.collection('projects').onSnapshot(snapshot => {
@@ -418,46 +437,28 @@
                 }
             }, [forceOffline]);
 
-            // Speichern im Lokalen Speicher (wenn kein Cloud Sync aktiv ist)
             useEffect(() => {
                 if ((!USE_CLOUD_SYNC || forceOffline) && !loading) {
                     localStorage.setItem('makerboard_projects', JSON.stringify(projects));
                 }
             }, [projects, loading, forceOffline]);
 
-            // Helfer-Funktion zum Speichern
             const saveProjectToCloud = async (projectId, data) => {
-                if (USE_CLOUD_SYNC && db && !forceOffline) {
-                    await db.collection('projects').doc(projectId).set(data);
-                }
+                if (USE_CLOUD_SYNC && db && !forceOffline) await db.collection('projects').doc(projectId).set(data);
             };
             const deleteProjectFromCloud = async (projectId) => {
-                if (USE_CLOUD_SYNC && db && !forceOffline) {
-                    await db.collection('projects').doc(projectId).delete();
-                }
+                if (USE_CLOUD_SYNC && db && !forceOffline) await db.collection('projects').doc(projectId).delete();
             };
 
             const handleCreateProject = (name, urgency) => {
-                const newProject = {
-                    id: crypto.randomUUID(),
-                    name: name,
-                    urgency: urgency,
-                    createdAt: Date.now(),
-                    sections: []
-                };
-                if (USE_CLOUD_SYNC && !forceOffline) {
-                    saveProjectToCloud(newProject.id, newProject);
-                } else {
-                    setProjects(prev => sortProjects([newProject, ...prev]));
-                }
+                const newProject = { id: crypto.randomUUID(), name, urgency, createdAt: Date.now(), sections: [] };
+                if (USE_CLOUD_SYNC && !forceOffline) saveProjectToCloud(newProject.id, newProject);
+                else setProjects(prev => sortProjects([newProject, ...prev]));
             };
 
             const handleDeleteProject = (id) => {
-                if (USE_CLOUD_SYNC && !forceOffline) {
-                    deleteProjectFromCloud(id);
-                } else {
-                    setProjects(prev => prev.filter(p => p.id !== id));
-                }
+                if (USE_CLOUD_SYNC && !forceOffline) deleteProjectFromCloud(id);
+                else setProjects(prev => prev.filter(p => p.id !== id));
                 if (currentProjectId === id) setCurrentProjectId(null);
             };
 
@@ -474,7 +475,6 @@
                 if (!project) return;
                 const newSection = { id: crypto.randomUUID(), title, duration: duration || null, description: description || '', completed: false, createdAt: Date.now() };
                 const updated = { ...project, sections: [...(project.sections || []), newSection] };
-                
                 if (USE_CLOUD_SYNC && !forceOffline) saveProjectToCloud(projectId, updated);
                 else setProjects(prev => prev.map(p => p.id === projectId ? updated : p));
             };
@@ -483,7 +483,6 @@
                 const project = projects.find(p => p.id === projectId);
                 if (!project) return;
                 const updated = { ...project, sections: project.sections.map(sec => sec.id === sectionId ? { ...sec, ...updates } : sec) };
-                
                 if (USE_CLOUD_SYNC && !forceOffline) saveProjectToCloud(projectId, updated);
                 else setProjects(prev => prev.map(p => p.id === projectId ? updated : p));
             };
@@ -492,7 +491,6 @@
                 const project = projects.find(p => p.id === projectId);
                 if (!project) return;
                 const updated = { ...project, sections: project.sections.map(sec => sec.id === sectionId ? { ...sec, completed: isCompleted } : sec) };
-                
                 if (USE_CLOUD_SYNC && !forceOffline) saveProjectToCloud(projectId, updated);
                 else setProjects(prev => prev.map(p => p.id === projectId ? updated : p));
             };
@@ -501,7 +499,6 @@
                 const project = projects.find(p => p.id === projectId);
                 if (!project) return;
                 const updated = { ...project, sections: project.sections.filter(sec => sec.id !== sectionId) };
-                
                 if (USE_CLOUD_SYNC && !forceOffline) saveProjectToCloud(projectId, updated);
                 else setProjects(prev => prev.map(p => p.id === projectId ? updated : p));
             };
@@ -522,11 +519,11 @@
                 else setProjects(prev => prev.map(p => p.id === projectId ? updated : p));
             };
 
-            if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div></div>;
+            if (loading) return <div className="flex-1 flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div></div>;
 
             if (dbError) {
                 return (
-                    <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4">
+                    <div className="flex-1 flex flex-col items-center justify-center p-4">
                         <div className="bg-red-900/30 border border-red-500/50 text-red-200 p-6 rounded-2xl max-w-md text-center shadow-xl mb-6">
                             <h2 className="text-xl font-bold mb-3 text-red-400">Datenbank nicht gefunden</h2>
                             <p className="mb-4 text-sm leading-relaxed">Dein Firebase-Projekt existiert, aber die eigentliche <b>Firestore Datenbank</b> wurde darin noch nicht erstellt.</p>
@@ -539,11 +536,8 @@
                             </ol>
                         </div>
                         <button 
-                            onClick={() => {
-                                setDbError(null);
-                                setForceOffline(true);
-                            }}
-                            className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-6 py-3 rounded-xl transition-colors border border-slate-700 hover:border-slate-500 font-medium"
+                            onClick={() => { setDbError(null); setForceOffline(true); }}
+                            className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-6 py-3 rounded-xl border border-slate-700 font-medium"
                         >
                             Trotzdem im Offline-Modus fortfahren
                         </button>
@@ -553,8 +547,9 @@
 
             const currentProject = projects.find(p => p.id === currentProjectId);
 
+            // Das umhüllende DIV hier ist extrem wichtig: flex-1 und min-h-0 geben den Container-Druck von oben weiter!
             return (
-                <div className="h-full w-full">
+                <div className="flex-1 w-full flex flex-col min-h-0 bg-slate-900">
                     {currentProjectId && currentProject ? (
                         <ProjectTimeline project={currentProject} onBack={() => setCurrentProjectId(null)} onAddSection={handleAddSection} onToggleSection={handleToggleSection} onDeleteSection={handleDeleteSection} onEditSection={handleEditSection} onMoveSection={handleMoveSection} />
                     ) : (
