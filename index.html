@@ -9,9 +9,8 @@
     
     <!-- PWA & Logo Setup: Erzeugt virtuelle Dateien im Speicher, damit Android die Installation erlaubt -->
     <script>
-        // Unser blaues Makerboard Logo als SVG
-        const svgIcon = encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='#3b82f6'/><path d='M256 120L140 370h232z' fill='white'/></svg>`);
-        const iconUrl = `data:image/svg+xml;charset=utf-8,${svgIcon}`;
+        // Absoluter Pfad zu deiner logo.png (wird automatisch aus der GitHub-URL berechnet)
+        const absoluteLogoUrl = new URL('logo.png', window.location.href).href;
         
         // Manifest generieren (inkl. 192x192 und 512x512 Größen, die Android fordert)
         const manifest = {
@@ -22,22 +21,26 @@
             background_color: "#0f172a",
             theme_color: "#3b82f6",
             icons: [
-                { src: iconUrl, sizes: "192x192", type: "image/svg+xml", purpose: "any maskable" },
-                { src: iconUrl, sizes: "512x512", type: "image/svg+xml", purpose: "any maskable" }
+                { src: absoluteLogoUrl, sizes: "192x192", type: "image/png", purpose: "any maskable" },
+                { src: absoluteLogoUrl, sizes: "512x512", type: "image/png", purpose: "any maskable" }
             ]
         };
-        const manifestBlob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
-        const manifestUrl = URL.createObjectURL(manifestBlob);
+        
+        // Das Manifest als Data-URI einbinden (verhindert Pfad-Fehler bei relativen URLs)
+        const manifestString = JSON.stringify(manifest);
+        const manifestUrl = 'data:application/manifest+json;charset=utf-8,' + encodeURIComponent(manifestString);
         
         document.write(`<link rel="manifest" href="${manifestUrl}">`);
-        document.write(`<link rel="apple-touch-icon" href="${iconUrl}">`);
+        document.write(`<link rel="apple-touch-icon" href="${absoluteLogoUrl}">`);
         
         // Dummy Service Worker generieren, um die Android-Installations-Anforderung zu befriedigen
         if ('serviceWorker' in navigator) {
             const swCode = `
                 self.addEventListener('install', e => self.skipWaiting());
                 self.addEventListener('activate', e => self.clients.claim());
-                self.addEventListener('fetch', e => {});
+                self.addEventListener('fetch', e => {
+                    // Ein leerer Fetch-Listener ist PFLICHT, damit Android Chrome die App als "installierbar" anerkennt!
+                });
             `;
             const swBlob = new Blob([swCode], {type: 'application/javascript'});
             const swUrl = URL.createObjectURL(swBlob);
