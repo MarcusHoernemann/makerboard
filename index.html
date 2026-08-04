@@ -10,7 +10,13 @@
     <!-- PWA & Logo Setup: Erzeugt virtuelle Dateien im Speicher, damit Android die Installation erlaubt -->
     <script>
         // Absoluter Pfad zu deiner logo.png (wird automatisch aus der GitHub-URL berechnet)
-        const absoluteLogoUrl = new URL('logo.png', window.location.href).href;
+        let absoluteLogoUrl = 'logo.png';
+        try {
+            // Dies schlägt in Preview-Umgebungen (wie Iframe/Blob) fehl, funktioniert aber live auf GitHub!
+            absoluteLogoUrl = new URL('logo.png', window.location.href).href;
+        } catch (e) {
+            console.warn("Vorschau-Umgebung erkannt: Verwende relativen Logo-Pfad.");
+        }
         
         // Manifest generieren (inkl. 192x192 und 512x512 Größen, die Android fordert)
         const manifest = {
