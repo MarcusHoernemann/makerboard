@@ -5,10 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=0" />
     <title>Makerboard</title>
     
-    <!-- PWA Verknüpfungen (Installierbarkeit) -->
-    <link rel="manifest" href="manifest.json" />
     <meta name="theme-color" content="#3b82f6" />
-    <link rel="apple-touch-icon" href="logo.png" />
+    
+    <!-- PWA Setup (Standalone/Inline) -->
+    <script>
+        (function() {
+            // Dynamisches Manifest und Icon generieren, um 404-Fehler zu vermeiden
+            const svgIcon = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='100' fill='%233b82f6'/%3E%3Cpath d='M256 120L140 370h232z' fill='white'/%3E%3C/svg%3E`;
+            const manifest = {
+                name: "Makerboard",
+                short_name: "Makerboard",
+                start_url: window.location.href.split('?')[0],
+                display: "standalone",
+                background_color: "#0f172a",
+                theme_color: "#3b82f6",
+                icons: [{ src: svgIcon, sizes: "512x512", type: "image/svg+xml", purpose: "any maskable" }]
+            };
+            const manifestBlob = new Blob([JSON.stringify(manifest)], {type: 'application/manifest+json'});
+            
+            const link = document.createElement('link');
+            link.rel = 'manifest';
+            link.href = URL.createObjectURL(manifestBlob);
+            document.head.appendChild(link);
+            
+            const icon = document.createElement('link');
+            icon.rel = 'apple-touch-icon';
+            icon.href = svgIcon;
+            document.head.appendChild(icon);
+        })();
+    </script>
     
     <!-- Tailwind CSS laden -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -377,11 +402,13 @@
             // Register Service Worker for PWA Android Install
             useEffect(() => {
                 if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.protocol === 'http:')) {
-                    navigator.serviceWorker.register('sw.js')
-                        .then(reg => console.log('SW registriert'))
+                    // Verwende einen inline Service Worker, damit Android nicht auf eine fehlende sw.js wartet
+                    const swCode = `self.addEventListener('fetch', function(e) { /* Dummy Fetch für PWA */ });`;
+                    const blob = new Blob([swCode], { type: 'application/javascript' });
+                    
+                    navigator.serviceWorker.register(URL.createObjectURL(blob))
+                        .then(reg => console.log('SW registriert (Inline)'))
                         .catch(err => console.error('SW Fehler:', err));
-                } else {
-                    console.log('Service Worker Registrierung für diese Vorschau-Umgebung übersprungen.');
                 }
             }, []);
 
