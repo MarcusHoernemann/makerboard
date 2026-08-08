@@ -6,6 +6,52 @@
     <meta name="theme-color" content="#0f172a">
     <title>Makerboard</title>
 
+    <!-- PWA & Logo Setup: Erzeugt virtuelle Dateien im Speicher, damit Android die Installation erlaubt -->
+    <script>
+        // Absoluter Pfad zu deiner logo.png
+        let absoluteLogoUrl = 'logo.png';
+        try {
+            absoluteLogoUrl = new URL('logo.png', window.location.href).href;
+        } catch (e) {
+            console.warn("Vorschau-Umgebung erkannt: Verwende relativen Logo-Pfad.");
+        }
+        
+        // Manifest generieren (inkl. 192x192 und 512x512 Größen, die Android fordert)
+        const manifest = {
+            name: "Makerboard",
+            short_name: "Makerboard",
+            start_url: window.location.pathname,
+            display: "standalone",
+            background_color: "#0f172a",
+            theme_color: "#3b82f6",
+            icons: [
+                { src: absoluteLogoUrl, sizes: "192x192", type: "image/png", purpose: "any maskable" },
+                { src: absoluteLogoUrl, sizes: "512x512", type: "image/png", purpose: "any maskable" }
+            ]
+        };
+        
+        // Das Manifest als Data-URI einbinden
+        const manifestString = JSON.stringify(manifest);
+        const manifestUrl = 'data:application/manifest+json;charset=utf-8,' + encodeURIComponent(manifestString);
+        
+        document.write(`<link rel="manifest" href="${manifestUrl}">`);
+        document.write(`<link rel="apple-touch-icon" href="${absoluteLogoUrl}">`);
+        
+        // Dummy Service Worker generieren, um die Android-Installations-Anforderung zu befriedigen
+        if ('serviceWorker' in navigator) {
+            const swCode = `
+                self.addEventListener('install', e => self.skipWaiting());
+                self.addEventListener('activate', e => self.clients.claim());
+                self.addEventListener('fetch', e => {
+                    // Ein leerer Fetch-Listener ist PFLICHT für die Installation!
+                });
+            `;
+            const swBlob = new Blob([swCode], {type: 'application/javascript'});
+            const swUrl = URL.createObjectURL(swBlob);
+            navigator.serviceWorker.register(swUrl).catch(err => console.log('SW Info:', err));
+        }
+    </script>
+
     <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- React & ReactDOM laden (Fehlte) -->
