@@ -6,9 +6,7 @@
     <meta name="theme-color" content="#0f172a">
     <title>Makerboard</title>
 
-    <!-- PWA & Logo Setup: Erzeugt virtuelle Dateien im Speicher, damit Android die Installation erlaubt -->
     <script>
-        // Absoluter Pfad zu deiner logo.png
         let absoluteLogoUrl = 'logo.png';
         try {
             absoluteLogoUrl = new URL('logo.png', window.location.href).href;
@@ -16,7 +14,6 @@
             console.warn("Vorschau-Umgebung erkannt: Verwende relativen Logo-Pfad.");
         }
         
-        // Manifest generieren (inkl. 192x192 und 512x512 Größen, die Android fordert)
         const manifest = {
             name: "Makerboard",
             short_name: "Makerboard",
@@ -30,21 +27,17 @@
             ]
         };
         
-        // Das Manifest als Data-URI einbinden
         const manifestString = JSON.stringify(manifest);
         const manifestUrl = 'data:application/manifest+json;charset=utf-8,' + encodeURIComponent(manifestString);
         
         document.write(`<link rel="manifest" href="${manifestUrl}">`);
         document.write(`<link rel="apple-touch-icon" href="${absoluteLogoUrl}">`);
         
-        // Dummy Service Worker generieren, um die Android-Installations-Anforderung zu befriedigen
         if ('serviceWorker' in navigator) {
             const swCode = `
                 self.addEventListener('install', e => self.skipWaiting());
                 self.addEventListener('activate', e => self.clients.claim());
-                self.addEventListener('fetch', e => {
-                    // Ein leerer Fetch-Listener ist PFLICHT für die Installation!
-                });
+                self.addEventListener('fetch', e => { });
             `;
             const swBlob = new Blob([swCode], {type: 'application/javascript'});
             const swUrl = URL.createObjectURL(swBlob);
@@ -53,21 +46,15 @@
     </script>
 
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- React & ReactDOM laden (Fehlte) -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-
-    <!-- Babel für JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Firebase SDK (Version 11) via ES Modules -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot, collection, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
-        // Globale Bereitstellung für das React-Skript
         window.FB = { initializeApp, getAuth, signInAnonymously, signInWithCustomToken, getFirestore, doc, setDoc, onSnapshot, collection, deleteDoc };
     </script>
 </head>
@@ -90,7 +77,8 @@
             Cloud: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></svg>,
             CloudOff: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22.61 16.95A4.5 4.5 0 0 0 18 10h-1.26a8 8 0 0 0-7.05-6M5 5a8 8 0 0 0 4 15h9a4.5 4.5 0 0 0 1.95-.45"></path><line x1="2" y1="2" x2="22" y2="22"></line></svg>,
             Refresh: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2v6h-6"></path><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M3 22v-6h6"></path><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path></svg>,
-            X: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            X: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>,
+            AlertTriangle: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
         };
 
         const URGENCY_LEVELS = {
@@ -99,6 +87,34 @@
             3: { label: 'Priorität 3', colorClass: 'text-yellow-400', bgClass: 'bg-yellow-400/10 border-yellow-400/20' },
             4: { label: 'Priorität 4', colorClass: 'text-blue-400', bgClass: 'bg-blue-400/10 border-blue-400/20' },
             5: { label: 'Priorität 5', colorClass: 'text-slate-400', bgClass: 'bg-slate-400/10 border-slate-400/20' }
+        };
+
+        // Hilfsfunktion zur Ermittlung, ob ein Projekt fertig ist
+        const isProjectCompleted = (project) => {
+            const total = project.sections?.length || 0;
+            const completed = project.sections?.filter(s => s.completed).length || 0;
+            return total > 0 && total === completed;
+        };
+
+        const ConfirmModal = ({ isOpen, message, onConfirm, onCancel }) => {
+            if (!isOpen) return null;
+            return (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
+                    <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm flex flex-col shadow-2xl overflow-hidden transform transition-all scale-100">
+                        <div className="p-6 flex flex-col items-center text-center">
+                            <div className="w-12 h-12 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center mb-4">
+                                <Icons.AlertTriangle />
+                            </div>
+                            <h3 className="text-xl font-bold text-slate-100 mb-2">Bist du sicher?</h3>
+                            <p className="text-slate-400 text-sm leading-relaxed">{message}</p>
+                        </div>
+                        <div className="px-6 py-4 border-t border-slate-800 flex justify-end gap-3 bg-slate-900/90">
+                            <button onClick={onCancel} className="flex-1 px-4 py-2.5 text-sm font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition-colors">Abbrechen</button>
+                            <button onClick={onConfirm} className="flex-1 px-4 py-2.5 text-sm font-medium bg-red-600 hover:bg-red-500 text-white rounded-xl transition-colors shadow-lg shadow-red-900/20">Löschen</button>
+                        </div>
+                    </div>
+                </div>
+            );
         };
 
         const SyncModal = ({ isOpen, onClose, syncCode, onApplySyncCode }) => {
@@ -162,7 +178,7 @@
             );
         };
 
-        const Dashboard = ({ projects, onCreateProject, onOpenProject, onDeleteProject, onEditProject, onOpenSync, syncStatus }) => {
+        const Dashboard = ({ projects, onCreateProject, onOpenProject, onDeleteProject, onEditProject, onOpenSync, syncStatus, onConfirmAction }) => {
             const [newProjectName, setNewProjectName] = useState('');
             const [newProjectUrgency, setNewProjectUrgency] = useState(3);
             const [editingId, setEditingId] = useState(null);
@@ -256,7 +272,7 @@
                                     const total = project.sections?.length || 0;
                                     const completed = project.sections?.filter(s => s.completed).length || 0;
                                     const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
-                                    const isCompleted = total > 0 && progress === 100;
+                                    const isCompleted = isProjectCompleted(project);
                                     const currentUrgency = project.urgency || 3;
 
                                     return (
@@ -264,7 +280,7 @@
                                             key={project.id} 
                                             onClick={() => { if(editingId !== project.id) onOpenProject(project); }}
                                             className={`border p-5 rounded-2xl cursor-pointer hover:shadow-xl transition-all group relative ${
-                                                isCompleted ? 'bg-blue-900/10 border-blue-500/30' : 'bg-slate-800 border-slate-700'
+                                                isCompleted ? 'bg-blue-900/10 border-blue-500/30 opacity-70 hover:opacity-100' : 'bg-slate-800 border-slate-700'
                                             }`}
                                         >
                                             <div className="flex justify-between items-start mb-4">
@@ -292,7 +308,7 @@
                                                         <div className="flex flex-col gap-2 pr-12">
                                                             <h2 className="text-xl font-semibold text-slate-100 flex items-center gap-3 flex-wrap">
                                                                 {project.name}
-                                                                {isCompleted && <span className="text-xs font-bold uppercase bg-blue-500 text-slate-900 px-2 py-1 rounded-md">Fertig</span>}
+                                                                {isCompleted && <span className="text-xs font-bold uppercase bg-blue-500 text-slate-900 px-2 py-1 rounded-md shadow-sm shadow-blue-500/20">Fertig</span>}
                                                             </h2>
                                                             <div className={`inline-flex w-max items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${URGENCY_LEVELS[currentUrgency].bgClass} ${URGENCY_LEVELS[currentUrgency].colorClass}`}>
                                                                 <Icons.Flag /> {URGENCY_LEVELS[currentUrgency].label}
@@ -300,7 +316,10 @@
                                                         </div>
                                                         <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                             <button onClick={(e) => { e.stopPropagation(); startEditing(project); }} className="text-slate-500 hover:text-blue-400 p-2"><Icons.Edit /></button>
-                                                            <button onClick={(e) => { e.stopPropagation(); onDeleteProject(project.id); }} className="text-slate-500 hover:text-red-400 p-2"><Icons.Trash /></button>
+                                                            <button onClick={(e) => { 
+                                                                e.stopPropagation(); 
+                                                                onConfirmAction(`Möchtest du das Projekt "${project.name}" wirklich dauerhaft löschen?`, () => onDeleteProject(project.id)); 
+                                                            }} className="text-slate-500 hover:text-red-400 p-2"><Icons.Trash /></button>
                                                         </div>
                                                     </>
                                                 )}
@@ -322,7 +341,7 @@
             );
         };
 
-        const ProjectTimeline = ({ project, onBack, onAddSection, onToggleSection, onDeleteSection, onEditSection, onMoveSection }) => {
+        const ProjectTimeline = ({ project, onBack, onAddSection, onToggleSection, onDeleteSection, onEditSection, onMoveSection, onConfirmAction }) => {
             const [newTitle, setNewTitle] = useState('');
             const [newDuration, setNewDuration] = useState('');
             const [newDescription, setNewDescription] = useState('');
@@ -415,7 +434,9 @@
                                                             <button onClick={(e) => { e.stopPropagation(); onMoveSection(project.id, index, -1); }} disabled={index === 0} className="text-slate-500 hover:text-blue-400 disabled:opacity-20 p-2"><Icons.ArrowUp /></button>
                                                             <button onClick={(e) => { e.stopPropagation(); onMoveSection(project.id, index, 1); }} disabled={index === sections.length - 1} className="text-slate-500 hover:text-blue-400 disabled:opacity-20 p-2"><Icons.ArrowDown /></button>
                                                             <button onClick={() => { setEditingId(section.id); setEditData({ title: section.title, duration: section.duration || '', description: section.description || '' }); }} className="text-slate-500 hover:text-blue-400 p-2"><Icons.Edit /></button>
-                                                            <button onClick={() => onDeleteSection(project.id, section.id)} className="text-slate-500 hover:text-red-400 p-2"><Icons.Trash /></button>
+                                                            <button onClick={() => {
+                                                                onConfirmAction(`Abschnitt "${section.title}" endgültig löschen?`, () => onDeleteSection(project.id, section.id));
+                                                            }} className="text-slate-500 hover:text-red-400 p-2"><Icons.Trash /></button>
                                                         </div>
                                                     </div>
                                                 )}
@@ -446,35 +467,60 @@
             const [currentProjectId, setCurrentProjectId] = useState(null);
             const [loading, setLoading] = useState(true);
             
+            // Bestätigungs-Modal Status
+            const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, message: '', onConfirm: null });
+
             // Sync & Cloud Status
             const [syncCode, setSyncCode] = useState('');
-            const [syncStatus, setSyncStatus] = useState('connecting'); // connecting, connected, error
+            const [syncStatus, setSyncStatus] = useState('connecting');
             const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
             
             // Firebase Instanzen
             const [dbInstance, setDbInstance] = useState(null);
             const [appIdStr, setAppIdStr] = useState('');
 
+            // Überarbeitete Sortierlogik: 1. Unfertig > Fertig | 2. Dringlichkeit | 3. Datum
             const sortProjects = (projList) => {
                 return [...projList].sort((a, b) => {
+                    const aCompleted = isProjectCompleted(a);
+                    const bCompleted = isProjectCompleted(b);
+
+                    // Fertige Projekte ans Ende stellen
+                    if (aCompleted && !bCompleted) return 1;
+                    if (!aCompleted && bCompleted) return -1;
+
+                    // Nach Dringlichkeit (1 ist am höchsten)
                     const urgA = a.urgency || 3;
                     const urgB = b.urgency || 3;
                     if (urgA !== urgB) return urgA - urgB;
+
+                    // Nach Erstellungsdatum
                     return b.createdAt - a.createdAt;
                 });
             };
 
-            // Init oder Laden des Sync-Codes beim Start
+            const requestConfirm = (message, onConfirm) => {
+                setConfirmConfig({ isOpen: true, message, onConfirm });
+            };
+
+            const closeConfirm = () => {
+                setConfirmConfig({ isOpen: false, message: '', onConfirm: null });
+            };
+
+            const executeConfirm = () => {
+                if (confirmConfig.onConfirm) confirmConfig.onConfirm();
+                closeConfirm();
+            };
+
             useEffect(() => {
                 let code = localStorage.getItem('makerboard_sync_code');
                 if (!code) {
-                    code = Math.random().toString(36).substring(2, 8).toUpperCase(); // Zufälliger 6-stelliger Code
+                    code = Math.random().toString(36).substring(2, 8).toUpperCase();
                     localStorage.setItem('makerboard_sync_code', code);
                 }
                 setSyncCode(code);
             }, []);
 
-            // Initialisiere Firebase Cloud Sync, sobald Sync-Code bereit ist
             useEffect(() => {
                 if (!syncCode) return;
                 
@@ -489,7 +535,6 @@
                     
                     const { initializeApp, getAuth, signInAnonymously, signInWithCustomToken, getFirestore, onSnapshot, collection } = window.FB;
                     
-                    // Fallback Config, falls extern keine übergeben wurde
                     const fbConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
                         apiKey: "AIzaSyCXDryC4C6ii9eacgtj_ALN_wsLxL-bwiw",
                         authDomain: "makerboard-488ad.firebaseapp.com",
@@ -506,7 +551,6 @@
                         const auth = getAuth(app);
                         const db = getFirestore(app);
 
-                        // Authentifizierung durchführen
                         if (initialToken) {
                             await signInWithCustomToken(auth, initialToken).catch(() => signInAnonymously(auth));
                         } else {
@@ -518,14 +562,13 @@
                         setDbInstance(db);
                         setAppIdStr(appId);
 
-                        // Sync-Daten lauschen. Alle Projekte dieses Sync-Codes liegen im gleichen "Workspace"
                         const collectionName = `board_${syncCode}`;
                         const projectsRef = collection(db, 'artifacts', appId, 'public', 'data', collectionName);
                         
                         unsubscribe = onSnapshot(projectsRef, (snapshot) => {
                             const loadedProjects = [];
                             snapshot.forEach(doc => loadedProjects.push({ id: doc.id, ...doc.data() }));
-                            setProjects(sortProjects(loadedProjects));
+                            setProjects(sortProjects(loadedProjects)); // Verwendet die neue Sortierung!
                             setSyncStatus('connected');
                             setLoading(false);
                         }, (err) => {
@@ -581,11 +624,9 @@
                 }
             };
 
-            // Daten-Operationen
             const handleCreateProject = (name, urgency) => {
                 const newProject = { id: crypto.randomUUID(), name, urgency, createdAt: Date.now(), sections: [] };
                 saveProjectToCloud(newProject);
-                // Optimistisches Update
                 setProjects(prev => sortProjects([newProject, ...prev]));
             };
 
@@ -609,7 +650,7 @@
                 const newSection = { id: crypto.randomUUID(), title, duration: duration || null, description: description || '', completed: false, createdAt: Date.now() };
                 const updated = { ...project, sections: [...(project.sections || []), newSection] };
                 saveProjectToCloud(updated);
-                setProjects(prev => prev.map(p => p.id === projectId ? updated : p));
+                setProjects(prev => sortProjects(prev.map(p => p.id === projectId ? updated : p))); // SortProjects hinzugefügt
             };
 
             const handleEditSection = (projectId, sectionId, updates) => {
@@ -617,7 +658,7 @@
                 if (!project) return;
                 const updated = { ...project, sections: project.sections.map(sec => sec.id === sectionId ? { ...sec, ...updates } : sec) };
                 saveProjectToCloud(updated);
-                setProjects(prev => prev.map(p => p.id === projectId ? updated : p));
+                setProjects(prev => sortProjects(prev.map(p => p.id === projectId ? updated : p)));
             };
 
             const handleToggleSection = (projectId, sectionId, isCompleted) => {
@@ -625,7 +666,8 @@
                 if (!project) return;
                 const updated = { ...project, sections: project.sections.map(sec => sec.id === sectionId ? { ...sec, completed: isCompleted } : sec) };
                 saveProjectToCloud(updated);
-                setProjects(prev => prev.map(p => p.id === projectId ? updated : p));
+                // SortProjects hier extrem wichtig, damit sich das Projekt ggf. direkt ans Ende schiebt!
+                setProjects(prev => sortProjects(prev.map(p => p.id === projectId ? updated : p)));
             };
 
             const handleDeleteSection = (projectId, sectionId) => {
@@ -633,7 +675,7 @@
                 if (!project) return;
                 const updated = { ...project, sections: project.sections.filter(sec => sec.id !== sectionId) };
                 saveProjectToCloud(updated);
-                setProjects(prev => prev.map(p => p.id === projectId ? updated : p));
+                setProjects(prev => sortProjects(prev.map(p => p.id === projectId ? updated : p)));
             };
 
             const handleMoveSection = (projectId, index, direction) => {
@@ -649,7 +691,7 @@
                 const updated = { ...project, sections: newSections };
 
                 saveProjectToCloud(updated);
-                setProjects(prev => prev.map(p => p.id === projectId ? updated : p));
+                setProjects(prev => sortProjects(prev.map(p => p.id === projectId ? updated : p)));
             };
 
             if (loading) {
@@ -666,9 +708,27 @@
             return (
                 <div className="flex-1 w-full flex flex-col min-h-0 bg-slate-900">
                     {currentProjectId && currentProject ? (
-                        <ProjectTimeline project={currentProject} onBack={() => setCurrentProjectId(null)} onAddSection={handleAddSection} onToggleSection={handleToggleSection} onDeleteSection={handleDeleteSection} onEditSection={handleEditSection} onMoveSection={handleMoveSection} />
+                        <ProjectTimeline 
+                            project={currentProject} 
+                            onBack={() => setCurrentProjectId(null)} 
+                            onAddSection={handleAddSection} 
+                            onToggleSection={handleToggleSection} 
+                            onDeleteSection={handleDeleteSection} 
+                            onEditSection={handleEditSection} 
+                            onMoveSection={handleMoveSection}
+                            onConfirmAction={requestConfirm}
+                        />
                     ) : (
-                        <Dashboard projects={projects} onCreateProject={handleCreateProject} onOpenProject={(proj) => setCurrentProjectId(proj.id)} onDeleteProject={handleDeleteProject} onEditProject={handleEditProject} onOpenSync={() => setIsSyncModalOpen(true)} syncStatus={syncStatus} />
+                        <Dashboard 
+                            projects={projects} 
+                            onCreateProject={handleCreateProject} 
+                            onOpenProject={(proj) => setCurrentProjectId(proj.id)} 
+                            onDeleteProject={handleDeleteProject} 
+                            onEditProject={handleEditProject} 
+                            onOpenSync={() => setIsSyncModalOpen(true)} 
+                            syncStatus={syncStatus} 
+                            onConfirmAction={requestConfirm}
+                        />
                     )}
                     
                     <SyncModal 
@@ -676,6 +736,13 @@
                         onClose={() => setIsSyncModalOpen(false)} 
                         syncCode={syncCode} 
                         onApplySyncCode={handleApplySyncCode} 
+                    />
+
+                    <ConfirmModal
+                        isOpen={confirmConfig.isOpen}
+                        message={confirmConfig.message}
+                        onConfirm={executeConfirm}
+                        onCancel={closeConfirm}
                     />
                 </div>
             );
