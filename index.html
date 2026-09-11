@@ -159,7 +159,7 @@
 
         .task-bar {
             position: absolute;
-            top: 18px;
+            top: 16px;
             height: 32px;
             border-radius: 8px;
             min-width: 8px;
@@ -328,6 +328,8 @@
     </div>
 </div>
 
+<div id="modal-container"></div>
+
 <script type="module">
 
 /* =========================================================
@@ -394,16 +396,13 @@ function uuid() {
 }
 
 function escapeHtml(value) {
-
-    const div =
-        document.createElement("div");
-
-    div.textContent =
-        value == null
-            ? ""
-            : String(value);
-
-    return div.innerHTML;
+    if (value == null) return "";
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 }
 
 function formatDuration(ms) {
@@ -583,6 +582,7 @@ function formatTimelineLabel(hours) {
 
 let projects = [];
 let currentProjectId = null;
+let isModalOpen = false;
 let unsubscribeProjects = null;
 
 let now = Date.now();
@@ -678,7 +678,9 @@ function subscribeToProjects() {
             });
 
             projects = sortProjects(list);
-            render();
+            if (!isModalOpen) {
+                render();
+            }
         },
         error => {
             console.error("[Makerboard] Firestore Sync Fehler:", error);
@@ -946,8 +948,6 @@ function render() {
             </main>
 
         </div>
-
-        <div id="modal-container"></div>
     `;
 }
 
@@ -1569,8 +1569,8 @@ function renderTimelineRow(
                                 title="${escapeHtml(section.description)}"
                                 class="mt-1 pb-2 text-[11px] text-slate-400/90 cursor-pointer select-none transition-all duration-200 hover:text-slate-200 ${
                                     isDescExpanded
-                                        ? "whitespace-normal line-clamp-3 bg-slate-950/40 p-1.5 rounded-md border border-slate-800/60"
-                                        : "truncate"
+                                        ? "whitespace-normal line-clamp-3 bg-slate-950/50 p-2 rounded-lg border border-slate-800/80"
+                                        : "truncate max-w-full"
                                 }">
                                 <span class="text-slate-500 font-mono mr-1 font-semibold">ℹ</span>${escapeHtml(section.description)}
                             </div>
@@ -1591,6 +1591,7 @@ function renderTimelineRow(
 function openProjectModal(
     projectId = null
 ) {
+    isModalOpen = true;
 
     const project =
         projectId
@@ -1803,7 +1804,7 @@ function openSectionModal(
     projectId,
     sectionId = null
 ) {
-
+    isModalOpen = true;
     currentProjectId = projectId;
 
     const project =
@@ -1890,7 +1891,7 @@ function openSectionModal(
                         </label>
                         <textarea
                             id="section-description"
-                            rows="3"
+                            rows="4"
                             class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white outline-none focus:border-blue-500 text-sm"
                             placeholder="Optional">${section ? escapeHtml(section.description || "") : ""}</textarea>
                     </div>
@@ -2161,6 +2162,7 @@ async function deleteSection(projectId, sectionId) {
 }
 
 function closeModal() {
+    isModalOpen = false;
     const modal = document.getElementById("modal-container");
     if (modal) modal.innerHTML = "";
 }
@@ -2197,7 +2199,7 @@ setInterval(() => {
             section.startedAt && !section.pausedAt && !section.completed && !section.completedAt
         )
     );
-    if (activeSections) {
+    if (activeSections && !isModalOpen) {
         render();
     }
 }, 30000);
