@@ -353,7 +353,6 @@ import {
     onSnapshot
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-
 const fbConfig = {
     apiKey: "AIzaSyCXDryC4C6ii9eacgtj_ALN_wsLxL-bwiw",
     authDomain: "makerboard-488ad.firebaseapp.com",
@@ -366,7 +365,6 @@ const fbConfig = {
 const firebaseApp = initializeApp(fbConfig);
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
-
 
 /* =========================================================
    HILFSFUNKTIONEN
@@ -395,7 +393,6 @@ function uuid() {
     );
 }
 
-
 function escapeHtml(value) {
 
     const div =
@@ -408,7 +405,6 @@ function escapeHtml(value) {
 
     return div.innerHTML;
 }
-
 
 function formatDuration(ms) {
 
@@ -436,7 +432,6 @@ function formatDuration(ms) {
     return `${hours} Std. ${rest} Min.`;
 }
 
-
 function getActualWorkMs(section) {
 
     let total =
@@ -459,7 +454,6 @@ function getActualWorkMs(section) {
     return total;
 }
 
-
 function getProjectProgress(project) {
 
     const sections =
@@ -480,7 +474,6 @@ function getProjectProgress(project) {
     );
 }
 
-
 function isProjectCompleted(project) {
 
     const sections =
@@ -494,7 +487,6 @@ function isProjectCompleted(project) {
         )
     );
 }
-
 
 function sortProjects(projectList) {
 
@@ -526,7 +518,6 @@ function sortProjects(projectList) {
         );
     });
 }
-
 
 /* =========================================================
    ZEITSTRAHL - DYNAMISCHE SKALIERUNG
@@ -586,7 +577,6 @@ function formatTimelineLabel(hours) {
     return `${hours}h`;
 }
 
-
 /* =========================================================
    APPLICATION STATE
 ========================================================= */
@@ -600,7 +590,6 @@ let now = Date.now();
 const collapsedProjects = {};
 const collapsedSections = {};
 const collapsedSchedules = {};
-
 
 /* =========================================================
    PRIORITÄTEN
@@ -644,7 +633,6 @@ const priorities = {
     }
 };
 
-
 function getPriority(priority) {
 
     const value =
@@ -653,7 +641,6 @@ function getPriority(priority) {
     return priorities[value] || priorities[3];
 }
 
-
 /* =========================================================
    FIREBASE SYNCHRONISATION (/projects)
 ========================================================= */
@@ -661,7 +648,6 @@ function getPriority(priority) {
 function getCollectionRef() {
     return collection(db, "projects");
 }
-
 
 function subscribeToProjects() {
 
@@ -700,7 +686,6 @@ function subscribeToProjects() {
     );
 }
 
-
 async function saveProject(project) {
     try {
         const ref = doc(getCollectionRef(), project.id);
@@ -711,7 +696,6 @@ async function saveProject(project) {
     }
 }
 
-
 async function removeProject(projectId) {
     try {
         await deleteDoc(doc(getCollectionRef(), projectId));
@@ -721,7 +705,6 @@ async function removeProject(projectId) {
         showToast("Löschen fehlgeschlagen", "error");
     }
 }
-
 
 /* =========================================================
    FIREBASE AUTH
@@ -750,7 +733,6 @@ async function authenticate() {
 }
 
 authenticate();
-
 
 /* =========================================================
    TOAST
@@ -804,7 +786,6 @@ function showToast(
         3000
     );
 }
-
 
 /* =========================================================
    ICONS
@@ -876,7 +857,6 @@ const icons = {
     `
 };
 
-
 /* =========================================================
    TOGGLES
 ========================================================= */
@@ -895,7 +875,6 @@ function toggleSection(sectionId) {
     collapsedSections[sectionId] = !collapsedSections[sectionId];
     render();
 }
-
 
 /* =========================================================
    HTML RENDER
@@ -928,7 +907,6 @@ function render() {
 
                     </div>
 
-
                     <div class="flex items-center gap-2">
 
                         <button
@@ -949,7 +927,6 @@ function render() {
 
             </header>
 
-
             <main class="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
 
                 ${
@@ -967,7 +944,6 @@ function render() {
         <div id="modal-container"></div>
     `;
 }
-
 
 function renderEmptyState() {
 
@@ -1004,7 +980,6 @@ function renderEmptyState() {
         </div>
     `;
 }
-
 
 function renderProject(project) {
 
@@ -1047,7 +1022,6 @@ function renderProject(project) {
 
                     </button>
 
-
                     <button
                         onclick="toggleProject('${project.id}')"
                         class="min-w-0 flex-1 text-left">
@@ -1058,14 +1032,12 @@ function renderProject(project) {
                                 ${escapeHtml(project.name)}
                             </h2>
 
-
                             <span
                                 class="px-2 py-0.5 rounded-full border text-[11px] sm:text-xs font-semibold ${priority.badgeClass}">
 
                                 ${priority.label}
 
                             </span>
-
 
                             ${
                                 completed
@@ -1078,7 +1050,6 @@ function renderProject(project) {
                             }
 
                         </div>
-
 
                         <div class="flex flex-wrap items-center gap-3 sm:gap-4 mt-1.5 text-xs sm:text-sm">
 
@@ -1098,7 +1069,6 @@ function renderProject(project) {
 
                     </button>
 
-
                     <div class="flex items-center gap-1.5 shrink-0">
 
                         <button
@@ -1108,7 +1078,6 @@ function renderProject(project) {
                             ${icons.edit}
 
                         </button>
-
 
                         <button
                             onclick="deleteProject('${project.id}')"
@@ -1121,7 +1090,6 @@ function renderProject(project) {
                     </div>
 
                 </div>
-
 
                 <div class="mt-3 sm:mt-4">
 
@@ -1137,7 +1105,6 @@ function renderProject(project) {
 
                     </div>
 
-
                     <div class="h-2 bg-slate-800 rounded-full overflow-hidden">
 
                         <div
@@ -1150,7 +1117,6 @@ function renderProject(project) {
                 </div>
 
             </div>
-
 
             ${
                 collapsed
@@ -1177,7 +1143,6 @@ function renderProject(project) {
 
                                 </button>
 
-
                                 <button
                                     onclick="openSectionModal('${project.id}')"
                                     class="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm font-medium">
@@ -1189,7 +1154,6 @@ function renderProject(project) {
                                 </button>
 
                             </div>
-
 
                             ${
                                 scheduleCollapsed
@@ -1210,7 +1174,6 @@ function renderProject(project) {
         </section>
     `;
 }
-
 
 function renderSchedule(project) {
 
@@ -1333,7 +1296,6 @@ function renderSchedule(project) {
         </div>
     `;
 }
-
 
 function renderTimelineRow(
     projectId,
@@ -1604,7 +1566,6 @@ function renderTimelineRow(
     `;
 }
 
-
 /* =========================================================
    PROJEKT MODAL
 ========================================================= */
@@ -1744,7 +1705,6 @@ function openProjectModal(
     `;
 }
 
-
 async function saveProjectForm(
     event,
     projectId
@@ -1816,7 +1776,6 @@ async function saveProjectForm(
             : "Projekt erstellt"
     );
 }
-
 
 /* =========================================================
    ABSCHNITT MODAL
@@ -1941,7 +1900,6 @@ function openSectionModal(
     `;
 }
 
-
 async function saveSectionForm(
     event,
     projectId,
@@ -2046,7 +2004,6 @@ async function saveSectionForm(
     );
 }
 
-
 /* =========================================================
    TASK STEUERUNG
 ========================================================= */
@@ -2139,7 +2096,6 @@ async function completeSection(projectId, sectionId) {
     showToast("Arbeitsschritt beendet");
 }
 
-
 /* =========================================================
    BEARBEITEN & LÖSCHEN
 ========================================================= */
@@ -2191,7 +2147,6 @@ function closeModal() {
     if (modal) modal.innerHTML = "";
 }
 
-
 /* =========================================================
    GLOBALE WINDOW REGISTRIERUNG
 ========================================================= */
@@ -2211,7 +2166,6 @@ window.toggleProject = toggleProject;
 window.toggleSchedule = toggleSchedule;
 window.toggleSection = toggleSection;
 window.closeModal = closeModal;
-
 
 /* =========================================================
    ZEIT AKTUALISIEREN & INITIAL RENDER
