@@ -344,6 +344,9 @@ const firebaseApp = initializeApp(fbConfig);
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
 
+// Hier greifen wir fest auf das Dokument makerboard-sync zu
+const appId = "makerboard-sync";
+
 
 /* =========================================================
    HILFSFUNKTIONEN
@@ -554,8 +557,16 @@ function formatTimelineLabel(hours) {
 ========================================================= */
 
 let projects = [];
+
 let currentProjectId = null;
+
+let syncCode =
+    localStorage.getItem(
+        "makerboard_sync_code"
+    ) || "";
+
 let unsubscribeProjects = null;
+let currentUser = null;
 
 let now = Date.now();
 
@@ -617,11 +628,25 @@ function getPriority(priority) {
 
 
 /* =========================================================
-   FIREBASE SYNCHRONISATION (DIREKT AUS /projects)
+   FIREBASE SYNCHRONISATION (PFAD: artifacts/makerboard-sync)
 ========================================================= */
 
 function getCollectionRef() {
-    return collection(db, "projects");
+
+    if (!syncCode) {
+        return null;
+    }
+
+    const cleanCode = syncCode.trim();
+
+    return collection(
+        db,
+        "artifacts",
+        appId,
+        "public",
+        "data",
+        "board_" + cleanCode
+    );
 }
 
 
@@ -632,24 +657,23 @@ function subscribeToProjects() {
         unsubscribeProjects = null;
     }
 
-    const colRef = getCollectionRef();
+    if (!syncCode) {
+        projects = [];
+        render();
+        return;
+    }
+
+    const ref = getCollectionRef();
+    if (!ref) return;
 
     unsubscribeProjects = onSnapshot(
-        colRef,
+        ref,
         snapshot => {
             const list = [];
-            console.log(`[Makerboard] Firestore Snapshot aus /projects empfangen (${snapshot.size} Dokumente):`);
-
             snapshot.forEach(item => {
-                const data = item.data();
-                console.log(`- ID: ${item.id}`, data);
                 list.push({
                     id: item.id,
-                    name: data.name || data.title || "Unbenanntes Projekt",
-                    urgency: data.urgency ?? data.priority ?? 3,
-                    createdAt: data.createdAt || 0,
-                    sections: data.sections || data.tasks || [],
-                    ...data
+                    ...item.data()
                 });
             });
 
@@ -657,14 +681,20 @@ function subscribeToProjects() {
             render();
         },
         error => {
-            console.error("[Makerboard] Firestore Fehler:", error);
-            showToast("Verbindungsfehler: " + error.message, "error");
+            console.error("Firebase Sync Fehler:", error);
+            showToast("Synchronisierung fehlgeschlagen: " + error.message, "error");
         }
     );
 }
 
 
 async function saveProject(project) {
+
+    if (!syncCode) {
+        showToast("Bitte zuerst einen Sync-Code eingeben.", "error");
+        return;
+    }
+
     try {
         const ref = doc(getCollectionRef(), project.id);
         await setDoc(ref, project);
@@ -676,6 +706,11 @@ async function saveProject(project) {
 
 
 async function removeProject(projectId) {
+
+    if (!syncCode) {
+        return;
+    }
+
     try {
         await deleteDoc(doc(getCollectionRef(), projectId));
         showToast("Projekt gelöscht", "success");
@@ -693,8 +728,8 @@ async function removeProject(projectId) {
 onAuthStateChanged(
     auth,
     user => {
-        if (user) {
-            console.log("[Makerboard] Authentifiziert mit UID:", user.uid);
+        currentUser = user;
+        if (user && syncCode) {
             subscribeToProjects();
         }
     }
@@ -705,7 +740,10 @@ async function authenticate() {
         if (!auth.currentUser) {
             await signInAnonymously(auth);
         } else {
-            subscribeToProjects();
+            currentUser = auth.currentUser;
+            if (syncCode) {
+                subscribeToProjects();
+            }
         }
     } catch (error) {
         console.error("Firebase Auth Fehler:", error);
@@ -780,6 +818,14 @@ const icons = {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
              stroke-width="2" class="w-5 h-5">
             <path d="M12 5v14M5 12h14"/>
+        </svg>
+    `,
+
+    settings: `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" class="w-5 h-5">
+            <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/>
+            <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.7 1.7-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.04 1.56V20h-2.4v-.2a1.7 1.7 0 0 0-1.04-1.56 1.7 1.7 0 0 0-1.88.34l-.06.06-1.7-1.7.06-.06A1.7 1.7 0 0 0 8.44 15a1.7 1.7 0 0 0-1.56-1.04H6.7v-2.4h.18A1.7 1.7 0 0 0 8.44 10a1.7 1.7 0 0 0-.34-1.88l-.06-.06 1.7-1.7.06.06a1.7 1.7 0 0 0 1.88.34 1.7 1.7 0 0 0 1.04-1.56V5h2.4v.2a1.7 1.7 0 0 0 1.04 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06 1.7 1.7-.06.06A1.7 1.7 0 0 0 19.4 10a1.7 1.7 0 0 0 1.56 1.04h.18v2.4h-.18A1.7 1.7 0 0 0 19.4 15Z"/>
         </svg>
     `,
 
@@ -887,7 +933,7 @@ function render() {
                         </h1>
 
                         <p class="text-xs text-slate-500 mt-1">
-                            ${projects.length} Projekt${projects.length === 1 ? "" : "e"} geladen
+                            Deine Projekte im Überblick
                         </p>
 
                     </div>
@@ -901,9 +947,18 @@ function render() {
 
                             ${icons.plus}
 
-                            <span>
-                                Neues Projekt
+                            <span class="hidden sm:inline">
+                                Projekt
                             </span>
+
+                        </button>
+
+                        <button
+                            onclick="openSettingsModal()"
+                            class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+                            title="Einstellungen">
+
+                            ${icons.settings}
 
                         </button>
 
@@ -915,6 +970,8 @@ function render() {
 
 
             <main class="max-w-7xl mx-auto px-4 py-6">
+
+                ${renderSyncNotice()}
 
                 ${
                     projects.length
@@ -933,6 +990,49 @@ function render() {
 }
 
 
+function renderSyncNotice() {
+
+    if (syncCode) {
+        return "";
+    }
+
+    return `
+
+        <div class="mb-6 p-4 rounded-2xl border border-amber-500/20 bg-amber-500/10">
+
+            <div class="flex gap-3">
+
+                <div class="text-amber-400 text-xl">
+                    ⚠
+                </div>
+
+                <div class="flex-1">
+
+                    <div class="font-semibold text-amber-300">
+                        Kein Sync-Code ausgewählt
+                    </div>
+
+                    <div class="text-sm text-slate-400 mt-1">
+                        Gib deinen vorhandenen Sync-Code ein, um deine Projekte zu laden und zu synchronisieren.
+                    </div>
+
+                    <button
+                        onclick="openSettingsModal()"
+                        class="mt-3 px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-sm font-semibold">
+
+                        Vorhandenen Code eingeben
+
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+    `;
+}
+
+
 function renderEmptyState() {
 
     return `
@@ -946,11 +1046,12 @@ function renderEmptyState() {
                 </div>
 
                 <h2 class="text-2xl font-bold text-white">
-                    Keine Projekte vorhanden
+                    Noch keine Projekte
                 </h2>
 
                 <p class="text-slate-400 mt-2">
-                    Erstelle dein erstes Projekt oder überprüfe die Verbindung zur Datenbank.
+                    Erstelle dein erstes Projekt und teile es in einzelne
+                    Arbeitsschritte auf.
                 </p>
 
                 <button
@@ -2228,13 +2329,120 @@ function closeModal() {
 
 
 /* =========================================================
+   SETTINGS MODAL (SYNC-CODE)
+========================================================= */
+
+function openSettingsModal() {
+
+    const modal = document.getElementById("modal-container");
+
+    modal.innerHTML = `
+
+        <div class="fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
+
+            <div class="w-full max-w-lg glass rounded-2xl shadow-2xl fade-in">
+
+                <div class="p-5 border-b border-slate-800 flex items-center justify-between">
+
+                    <h2 class="text-lg font-bold text-white">
+                        Einstellungen
+                    </h2>
+
+                    <button
+                        onclick="closeModal()"
+                        class="p-2 rounded-lg hover:bg-slate-800 text-slate-400">
+                        ${icons.close}
+                    </button>
+
+                </div>
+
+                <form
+                    onsubmit="saveSyncCode(event)"
+                    class="p-5 space-y-5">
+
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-2">
+                            Vorhandenen Sync-Code
+                        </label>
+
+                        <input
+                            id="sync-code"
+                            value="${escapeHtml(syncCode)}"
+                            class="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white outline-none focus:border-blue-500"
+                            placeholder="z. B. mein-makerboard-2026">
+
+                        <p class="text-xs text-slate-500 mt-2">
+                            Verwende den bereits vorhandenen Code deiner Datenbank.
+                            Auf allen Geräten mit demselben Code werden dieselben Projekte geladen.
+                        </p>
+                    </div>
+
+                    <div class="rounded-xl bg-slate-900 border border-slate-800 p-4">
+                        <div class="text-sm font-semibold text-white">
+                            Synchronisation
+                        </div>
+                        <div class="text-xs text-slate-500 mt-1">
+                            ${
+                                syncCode
+                                    ? "Aktiver Sync-Code: " + escapeHtml(syncCode)
+                                    : "Kein Sync-Code ausgewählt."
+                            }
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end gap-2">
+                        <button
+                            type="button"
+                            onclick="closeModal()"
+                            class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300">
+                            Abbrechen
+                        </button>
+
+                        <button
+                            type="submit"
+                            class="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold">
+                            Speichern
+                        </button>
+                    </div>
+
+                </form>
+
+            </div>
+
+        </div>
+    `;
+}
+
+async function saveSyncCode(event) {
+    event.preventDefault();
+
+    const input = document.getElementById("sync-code");
+    const value = input.value.trim();
+
+    if (!value) {
+        showToast("Bitte einen vorhandenen Sync-Code eingeben.", "error");
+        return;
+    }
+
+    syncCode = value;
+    localStorage.setItem("makerboard_sync_code", syncCode);
+
+    closeModal();
+    subscribeToProjects();
+    showToast("Sync-Code übernommen");
+}
+
+
+/* =========================================================
    GLOBALE WINDOW REGISTRIERUNG
 ========================================================= */
 
 window.openProjectModal = openProjectModal;
+window.openSettingsModal = openSettingsModal;
 window.openSectionModal = openSectionModal;
 window.saveProjectForm = saveProjectForm;
 window.saveSectionForm = saveSectionForm;
+window.saveSyncCode = saveSyncCode;
 window.startSection = startSection;
 window.pauseSection = pauseSection;
 window.completeSection = completeSection;
