@@ -308,7 +308,7 @@
 <script type="module">
 
 /* =========================================================
-   FIREBASE
+   FIREBASE INITIALISIERUNG
 ========================================================= */
 
 import {
@@ -512,7 +512,7 @@ function sortProjects(projectList) {
 
 
 /* =========================================================
-   ZEITSTRAHL - RELATIVE ZEIT
+   ZEITSTRAHL
 ========================================================= */
 
 function getTimelineHours(project) {
@@ -569,15 +569,12 @@ let syncCode =
     ) || "";
 
 let unsubscribeProjects = null;
-let unsubscribeFallback = null;
 let currentUser = null;
 
 let now = Date.now();
 
 const collapsedProjects = {};
-
 const collapsedSections = {};
-
 const collapsedSchedules = {};
 
 
@@ -634,10 +631,10 @@ function getPriority(priority) {
 
 
 /* =========================================================
-   FIREBASE SYNCHRONISIERUNG
+   FIREBASE SYNCHRONISIERUNG (FESTER ARTIFACTS PFAD)
 ========================================================= */
 
-function getPrimaryCollectionRef() {
+function getCollectionRef() {
 
     if (!syncCode) {
         return null;
@@ -655,21 +652,6 @@ function getPrimaryCollectionRef() {
     );
 }
 
-function getFallbackCollectionRef() {
-
-    if (!syncCode) {
-        return null;
-    }
-
-    const cleanCode = syncCode.trim();
-
-    return collection(
-        db,
-        "makerboard_" + cleanCode
-    );
-}
-
-let activeRefType = "primary";
 
 function subscribeToProjects() {
 
@@ -678,99 +660,32 @@ function subscribeToProjects() {
         unsubscribeProjects = null;
     }
 
-    if (unsubscribeFallback) {
-        unsubscribeFallback();
-        unsubscribeFallback = null;
-    }
-
     if (!syncCode) {
         projects = [];
         render();
         return;
     }
 
-    const primaryRef = getPrimaryCollectionRef();
-    const fallbackRef = getFallbackCollectionRef();
-
-    console.log("[Makerboard] Starte Synchronisation für Code:", syncCode.trim());
+    const ref = getCollectionRef();
+    if (!ref) return;
 
     unsubscribeProjects = onSnapshot(
-        primaryRef,
+        ref,
         snapshot => {
-
-            console.log("[Makerboard] Primary Snapshot empfangen. Anzahl Dokumente:", snapshot.size);
-
-            if (!snapshot.empty) {
-                activeRefType = "primary";
-                const list = [];
-                snapshot.forEach(item => {
-                    list.push({
-                        id: item.id,
-                        ...item.data()
-                    });
+            const list = [];
+            snapshot.forEach(item => {
+                list.push({
+                    id: item.id,
+                    ...item.data()
                 });
+            });
 
-                projects = sortProjects(list);
-                render();
-            } else {
-                // Wenn primary leer ist, versuche Fallback-Root-Collection zu prüfen
-                if (!unsubscribeFallback) {
-                    unsubscribeFallback = onSnapshot(
-                        fallbackRef,
-                        fbSnapshot => {
-                            console.log("[Makerboard] Fallback Snapshot empfangen. Anzahl Dokumente:", fbSnapshot.size);
-                            if (!fbSnapshot.empty) {
-                                activeRefType = "fallback";
-                                const list = [];
-                                fbSnapshot.forEach(item => {
-                                    list.push({
-                                        id: item.id,
-                                        ...item.data()
-                                    });
-                                });
-                                projects = sortProjects(list);
-                                render();
-                            } else {
-                                if (activeRefType === "primary") {
-                                    projects = [];
-                                    render();
-                                }
-                            }
-                        },
-                        fbErr => {
-                            console.warn("[Makerboard] Fallback Abfrage:", fbErr.message);
-                        }
-                    );
-                } else {
-                    projects = [];
-                    render();
-                }
-            }
+            projects = sortProjects(list);
+            render();
         },
         error => {
-            console.error("[Makerboard] Primary Sync Fehler:", error);
-            // Bei Fehler (z. B. Pfadbeschränkung) direkt Fallback schalten
-            activeRefType = "fallback";
-            if (!unsubscribeFallback) {
-                unsubscribeFallback = onSnapshot(
-                    fallbackRef,
-                    fbSnapshot => {
-                        const list = [];
-                        fbSnapshot.forEach(item => {
-                            list.push({
-                                id: item.id,
-                                ...item.data()
-                            });
-                        });
-                        projects = sortProjects(list);
-                        render();
-                    },
-                    fbErr => {
-                        console.error("[Makerboard] Fallback Sync Fehler:", fbErr);
-                        showToast("Synchronisierung fehlgeschlagen: " + fbErr.message, "error");
-                    }
-                );
-            }
+            console.error("Firebase Sync Fehler:", error);
+            showToast("Synchronisierung fehlgeschlagen: " + error.message, "error");
         }
     );
 }
@@ -779,43 +694,16 @@ function subscribeToProjects() {
 async function saveProject(project) {
 
     if (!syncCode) {
-
-        showToast(
-            "Bitte zuerst einen vorhandenen Sync-Code eingeben.",
-            "error"
-        );
-
+        showToast("Bitte zuerst einen vorhandenen Sync-Code eingeben.", "error");
         return;
     }
 
     try {
-
-        const targetRef = activeRefType === "primary"
-            ? getPrimaryCollectionRef()
-            : getFallbackCollectionRef();
-
-        const ref =
-            doc(
-                targetRef,
-                project.id
-            );
-
-        await setDoc(
-            ref,
-            project
-        );
-
+        const ref = doc(getCollectionRef(), project.id);
+        await setDoc(ref, project);
     } catch (error) {
-
-        console.error(
-            "Projekt konnte nicht gespeichert werden:",
-            error
-        );
-
-        showToast(
-            "Speichern fehlgeschlagen: " + error.message,
-            "error"
-        );
+        console.error("Projekt konnte nicht gespeichert werden:", error);
+        showToast("Speichern fehlgeschlagen: " + error.message, "error");
     }
 }
 
@@ -827,57 +715,31 @@ async function removeProject(projectId) {
     }
 
     try {
-
-        const targetRef = activeRefType === "primary"
-            ? getPrimaryCollectionRef()
-            : getFallbackCollectionRef();
-
-        await deleteDoc(
-            doc(
-                targetRef,
-                projectId
-            )
-        );
-
-        showToast(
-            "Projekt gelöscht",
-            "success"
-        );
-
+        await deleteDoc(doc(getCollectionRef(), projectId));
+        showToast("Projekt gelöscht", "success");
     } catch (error) {
-
         console.error(error);
-
-        showToast(
-            "Löschen fehlgeschlagen",
-            "error"
-        );
+        showToast("Löschen fehlgeschlagen", "error");
     }
 }
 
 
 /* =========================================================
-   FIREBASE VERBINDUNG & AUTH
+   FIREBASE AUTH
 ========================================================= */
 
 onAuthStateChanged(
     auth,
     user => {
-
         currentUser = user;
-        console.log("[Makerboard] Auth-Status:", user ? "Angemeldet (UID: " + user.uid + ")" : "Nicht angemeldet");
-
         if (user && syncCode) {
             subscribeToProjects();
         }
-
     }
 );
 
 async function authenticate() {
-
     try {
-
         if (!auth.currentUser) {
             await signInAnonymously(auth);
         } else {
@@ -886,15 +748,9 @@ async function authenticate() {
                 subscribeToProjects();
             }
         }
-
     } catch (error) {
-
         console.error("Firebase Auth Fehler:", error);
-
-        showToast(
-            "Firebase-Anmeldung fehlgeschlagen: " + error.message,
-            "error"
-        );
+        showToast("Firebase-Anmeldung fehlgeschlagen: " + error.message, "error");
     }
 }
 
@@ -1051,40 +907,21 @@ const icons = {
 
 
 /* =========================================================
-   PROJEKT EIN-/AUSKLAPPEN
+   TOGGLES
 ========================================================= */
 
 function toggleProject(projectId) {
-
-    collapsedProjects[projectId] =
-        !collapsedProjects[projectId];
-
+    collapsedProjects[projectId] = !collapsedProjects[projectId];
     render();
 }
-
-
-/* =========================================================
-   ZEITPLAN EIN-/AUSKLAPPEN
-========================================================= */
 
 function toggleSchedule(projectId) {
-
-    collapsedSchedules[projectId] =
-        !collapsedSchedules[projectId];
-
+    collapsedSchedules[projectId] = !collapsedSchedules[projectId];
     render();
 }
 
-
-/* =========================================================
-   ABSCHNITT EIN-/AUSKLAPPEN
-========================================================= */
-
 function toggleSection(sectionId) {
-
-    collapsedSections[sectionId] =
-        !collapsedSections[sectionId];
-
+    collapsedSections[sectionId] = !collapsedSections[sectionId];
     render();
 }
 
@@ -1172,10 +1009,6 @@ function render() {
 }
 
 
-/* =========================================================
-   SYNC HINWEIS
-========================================================= */
-
 function renderSyncNotice() {
 
     if (syncCode) {
@@ -1220,10 +1053,6 @@ function renderSyncNotice() {
 }
 
 
-/* =========================================================
-   LEERER STATUS
-========================================================= */
-
 function renderEmptyState() {
 
     return `
@@ -1261,10 +1090,6 @@ function renderEmptyState() {
     `;
 }
 
-
-/* =========================================================
-   PROJEKT
-========================================================= */
 
 function renderProject(project) {
 
@@ -1472,10 +1297,6 @@ function renderProject(project) {
 }
 
 
-/* =========================================================
-   ZEITPLAN
-========================================================= */
-
 function renderSchedule(project) {
 
     const sections =
@@ -1593,10 +1414,6 @@ function renderSchedule(project) {
     `;
 }
 
-
-/* =========================================================
-   ZEITPLAN-ZEILE
-========================================================= */
 
 function renderTimelineRow(
     projectId,
@@ -1934,7 +1751,7 @@ function renderTimelineRow(
 
 
 /* =========================================================
-   PROJEKT-MODAL
+   PROJEKT MODAL
 ========================================================= */
 
 function openProjectModal(
@@ -2091,7 +1908,6 @@ async function saveProjectForm(
 
     event.preventDefault();
 
-
     const name =
         document
             .getElementById(
@@ -2099,7 +1915,6 @@ async function saveProjectForm(
             )
             .value
             .trim();
-
 
     const urgency =
         Number(
@@ -2110,54 +1925,35 @@ async function saveProjectForm(
                 .value
         );
 
-
     if (!name) {
         return;
     }
 
-
     let project;
 
-
     if (projectId) {
-
         const old =
             projects.find(
                 p => p.id === projectId
             );
-
 
         project = {
             ...old,
             name,
             urgency
         };
-
     } else {
-
         project = {
-
             id: uuid(),
-
             name,
-
             urgency,
-
-            createdAt:
-                Date.now(),
-
+            createdAt: Date.now(),
             sections: []
         };
     }
 
-
     closeModal();
-
-
-    await saveProject(
-        project
-    );
-
+    await saveProject(project);
 
     projects =
         sortProjects(
@@ -2168,9 +1964,7 @@ async function saveProjectForm(
                 .concat(project)
         );
 
-
     render();
-
 
     showToast(
         projectId
@@ -2181,7 +1975,7 @@ async function saveProjectForm(
 
 
 /* =========================================================
-   ABSCHNITT-MODAL
+   ABSCHNITT MODAL
 ========================================================= */
 
 function openSectionModal(
@@ -2189,20 +1983,16 @@ function openSectionModal(
     sectionId = null
 ) {
 
-    currentProjectId =
-        projectId;
-
+    currentProjectId = projectId;
 
     const project =
         projects.find(
             p => p.id === projectId
         );
 
-
     if (!project) {
         return;
     }
-
 
     const section =
         sectionId
@@ -2211,12 +2001,10 @@ function openSectionModal(
             )
             : null;
 
-
     const modal =
         document.getElementById(
             "modal-container"
         );
-
 
     modal.innerHTML = `
 
@@ -2227,56 +2015,41 @@ function openSectionModal(
                 <div class="p-5 border-b border-slate-800 flex items-center justify-between">
 
                     <h2 class="text-lg font-bold text-white">
-
                         ${
                             section
                                 ? "Arbeitsschritt bearbeiten"
                                 : "Arbeitsschritt hinzufügen"
                         }
-
                     </h2>
-
 
                     <button
                         onclick="closeModal()"
                         class="p-2 rounded-lg hover:bg-slate-800 text-slate-400">
-
                         ${icons.close}
-
                     </button>
 
                 </div>
-
 
                 <form
                     onsubmit="saveSectionForm(event, '${projectId}', '${sectionId || ""}')"
                     class="p-5 space-y-4">
 
-
                     <div>
-
                         <label class="block text-sm font-medium text-slate-300 mb-2">
                             Arbeitsschritt
                         </label>
-
-
                         <input
                             id="section-title"
                             required
                             value="${section ? escapeHtml(section.title) : ""}"
                             class="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white outline-none focus:border-blue-500"
                             placeholder="z. B. Gehäuse konstruieren">
-
                     </div>
 
-
                     <div>
-
                         <label class="block text-sm font-medium text-slate-300 mb-2">
                             Geplante Dauer in Stunden
                         </label>
-
-
                         <input
                             id="section-duration"
                             type="number"
@@ -2285,50 +2058,35 @@ function openSectionModal(
                             value="${section?.duration || 1}"
                             class="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white outline-none focus:border-blue-500">
 
-
                         <p class="text-xs text-slate-500 mt-1">
                             Die geplante Dauer wird als grauer Balken im Zeitplan angezeigt.
                         </p>
-
                     </div>
 
-
                     <div>
-
                         <label class="block text-sm font-medium text-slate-300 mb-2">
                             Beschreibung
                         </label>
-
-
                         <textarea
                             id="section-description"
                             rows="4"
                             class="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white outline-none focus:border-blue-500"
                             placeholder="Optional">${section ? escapeHtml(section.description || "") : ""}</textarea>
-
                     </div>
 
-
                     <div class="flex justify-end gap-2 pt-2">
-
                         <button
                             type="button"
                             onclick="closeModal()"
                             class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300">
-
                             Abbrechen
-
                         </button>
-
 
                         <button
                             type="submit"
                             class="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold">
-
                             Speichern
-
                         </button>
-
                     </div>
 
                 </form>
@@ -2348,17 +2106,14 @@ async function saveSectionForm(
 
     event.preventDefault();
 
-
     const project =
         projects.find(
             p => p.id === projectId
         );
 
-
     if (!project) {
         return;
     }
-
 
     const title =
         document
@@ -2367,7 +2122,6 @@ async function saveSectionForm(
             )
             .value
             .trim();
-
 
     const duration =
         Number(
@@ -2378,7 +2132,6 @@ async function saveSectionForm(
                 .value
         ) || 1;
 
-
     const description =
         document
             .getElementById(
@@ -2387,83 +2140,48 @@ async function saveSectionForm(
             .value
             .trim();
 
-
     if (!title) {
         return;
     }
 
-
-    let sections =
-        [
-            ...(project.sections || [])
-        ];
-
+    let sections = [
+        ...(project.sections || [])
+    ];
 
     if (sectionId) {
-
-        sections =
-            sections.map(
-                section => {
-
-                    if (
-                        section.id !== sectionId
-                    ) {
-                        return section;
-                    }
-
-
-                    return {
-                        ...section,
-                        title,
-                        duration,
-                        description
-                    };
-                }
-            );
-
+        sections = sections.map(section => {
+            if (section.id !== sectionId) {
+                return section;
+            }
+            return {
+                ...section,
+                title,
+                duration,
+                description
+            };
+        });
     } else {
-
         sections.push({
-
             id: uuid(),
-
             title,
-
             duration,
-
             description,
-
             completed: false,
-
             startedAt: null,
-
             pausedAt: null,
-
             completedAt: null,
-
             totalWorkMs: 0,
-
-            createdAt:
-                Date.now()
+            createdAt: Date.now()
         });
     }
 
-
     const updated = {
-
         ...project,
-
         sections
     };
 
-
     closeModal();
-
-
-    await saveProject(
-        updated
-    );
-
+    await saveProject(updated);
 
     projects =
         sortProjects(
@@ -2475,9 +2193,7 @@ async function saveSectionForm(
             )
         );
 
-
     render();
-
 
     showToast(
         sectionId
@@ -2488,432 +2204,141 @@ async function saveSectionForm(
 
 
 /* =========================================================
-   START / FORTSETZEN
+   TASK STEUERUNG
 ========================================================= */
 
-async function startSection(
-    projectId,
-    sectionId
-) {
+async function startSection(projectId, sectionId) {
+    const project = projects.find(p => p.id === projectId);
+    if (!project) return;
 
-    const project =
-        projects.find(
-            p => p.id === projectId
-        );
-
-
-    if (!project) {
-        return;
-    }
-
-
-    const startedAt =
-        Date.now();
-
-
+    const startedAt = Date.now();
     const updated = {
-
         ...project,
-
-        sections:
-            project.sections.map(
-                section => {
-
-                    if (
-                        section.id !== sectionId
-                    ) {
-                        return section;
-                    }
-
-
-                    return {
-
-                        ...section,
-
-                        completed: false,
-
-                        completedAt: null,
-
-                        pausedAt: null,
-
-                        startedAt,
-
-                        totalWorkMs:
-                            Number(
-                                section.totalWorkMs
-                            ) || 0
-                    };
-                }
-            )
+        sections: project.sections.map(section => {
+            if (section.id !== sectionId) return section;
+            return {
+                ...section,
+                completed: false,
+                completedAt: null,
+                pausedAt: null,
+                startedAt,
+                totalWorkMs: Number(section.totalWorkMs) || 0
+            };
+        })
     };
 
-
-    await saveProject(
-        updated
-    );
-
-
-    projects =
-        sortProjects(
-            projects.map(
-                p =>
-                    p.id === projectId
-                        ? updated
-                        : p
-            )
-        );
-
-
+    await saveProject(updated);
+    projects = sortProjects(projects.map(p => p.id === projectId ? updated : p));
     render();
+    showToast("Arbeitsschritt gestartet");
+}
 
+async function pauseSection(projectId, sectionId) {
+    const project = projects.find(p => p.id === projectId);
+    if (!project) return;
 
-    showToast(
-        "Arbeitsschritt gestartet"
-    );
+    const pauseTime = Date.now();
+    const updated = {
+        ...project,
+        sections: project.sections.map(section => {
+            if (section.id !== sectionId) return section;
+
+            let totalWorkMs = Number(section.totalWorkMs) || 0;
+            if (section.startedAt && !section.pausedAt) {
+                totalWorkMs += Math.max(0, pauseTime - Number(section.startedAt));
+            }
+
+            return {
+                ...section,
+                totalWorkMs,
+                pausedAt: pauseTime,
+                startedAt: null
+            };
+        })
+    };
+
+    await saveProject(updated);
+    projects = sortProjects(projects.map(p => p.id === projectId ? updated : p));
+    render();
+    showToast("Arbeitsschritt pausiert");
+}
+
+async function completeSection(projectId, sectionId) {
+    const project = projects.find(p => p.id === projectId);
+    if (!project) return;
+
+    const completedAt = Date.now();
+    const updated = {
+        ...project,
+        sections: project.sections.map(section => {
+            if (section.id !== sectionId) return section;
+
+            let totalWorkMs = Number(section.totalWorkMs) || 0;
+            if (section.startedAt && !section.pausedAt) {
+                totalWorkMs += Math.max(0, completedAt - Number(section.startedAt));
+            }
+
+            return {
+                ...section,
+                totalWorkMs,
+                completed: true,
+                completedAt,
+                pausedAt: null,
+                startedAt: null
+            };
+        })
+    };
+
+    await saveProject(updated);
+    projects = sortProjects(projects.map(p => p.id === projectId ? updated : p));
+    render();
+    showToast("Arbeitsschritt beendet");
 }
 
 
 /* =========================================================
-   PAUSE
+   BEARBEITEN & LÖSCHEN
 ========================================================= */
 
-async function pauseSection(
-    projectId,
-    sectionId
-) {
+function editProject(projectId) {
+    openProjectModal(projectId);
+}
 
-    const project =
-        projects.find(
-            p => p.id === projectId
-        );
+function editSection(projectId, sectionId) {
+    openSectionModal(projectId, sectionId);
+}
 
+async function deleteProject(projectId) {
+    const project = projects.find(p => p.id === projectId);
+    if (!project) return;
 
-    if (!project) {
+    if (!confirm(`Projekt "${project.name}" wirklich löschen?`)) {
         return;
     }
 
-
-    const pauseTime =
-        Date.now();
-
-
-    const updated = {
-
-        ...project,
-
-        sections:
-            project.sections.map(
-                section => {
-
-                    if (
-                        section.id !== sectionId
-                    ) {
-                        return section;
-                    }
-
-
-                    let totalWorkMs =
-                        Number(
-                            section.totalWorkMs
-                        ) || 0;
-
-
-                    if (
-                        section.startedAt &&
-                        !section.pausedAt
-                    ) {
-
-                        totalWorkMs +=
-                            Math.max(
-                                0,
-                                pauseTime -
-                                Number(
-                                    section.startedAt
-                                )
-                            );
-                    }
-
-
-                    return {
-
-                        ...section,
-
-                        totalWorkMs,
-
-                        pausedAt:
-                            pauseTime,
-
-                        startedAt:
-                            null
-                    };
-                }
-            )
-    };
-
-
-    await saveProject(
-        updated
-    );
-
-
-    projects =
-        sortProjects(
-            projects.map(
-                p =>
-                    p.id === projectId
-                        ? updated
-                        : p
-            )
-        );
-
-
-    render();
-
-
-    showToast(
-        "Arbeitsschritt pausiert"
-    );
-}
-
-
-/* =========================================================
-   BEENDEN
-========================================================= */
-
-async function completeSection(
-    projectId,
-    sectionId
-) {
-
-    const project =
-        projects.find(
-            p => p.id === projectId
-        );
-
-
-    if (!project) {
-        return;
-    }
-
-
-    const completedAt =
-        Date.now();
-
-
-    const updated = {
-
-        ...project,
-
-        sections:
-            project.sections.map(
-                section => {
-
-                    if (
-                        section.id !== sectionId
-                    ) {
-                        return section;
-                    }
-
-
-                    let totalWorkMs =
-                        Number(
-                            section.totalWorkMs
-                        ) || 0;
-
-
-                    if (
-                        section.startedAt &&
-                        !section.pausedAt
-                    ) {
-
-                        totalWorkMs +=
-                            Math.max(
-                                0,
-                                completedAt -
-                                Number(
-                                    section.startedAt
-                                )
-                            );
-                    }
-
-
-                    return {
-
-                        ...section,
-
-                        totalWorkMs,
-
-                        completed: true,
-
-                        completedAt,
-
-                        pausedAt: null,
-
-                        startedAt: null
-                    };
-                }
-            )
-    };
-
-
-    await saveProject(
-        updated
-    );
-
-
-    projects =
-        sortProjects(
-            projects.map(
-                p =>
-                    p.id === projectId
-                        ? updated
-                        : p
-            )
-        );
-
-
-    render();
-
-
-    showToast(
-        "Arbeitsschritt beendet"
-    );
-}
-
-
-/* =========================================================
-   BEARBEITEN
-========================================================= */
-
-function editProject(
-    projectId
-) {
-
-    openProjectModal(
-        projectId
-    );
-}
-
-
-function editSection(
-    projectId,
-    sectionId
-) {
-
-    openSectionModal(
-        projectId,
-        sectionId
-    );
-}
-
-
-/* =========================================================
-   LÖSCHEN
-========================================================= */
-
-async function deleteProject(
-    projectId
-) {
-
-    const project =
-        projects.find(
-            p => p.id === projectId
-        );
-
-
-    if (!project) {
-        return;
-    }
-
-
-    if (
-        !confirm(
-            `Projekt "${project.name}" wirklich löschen?`
-        )
-    ) {
-        return;
-    }
-
-
-    await removeProject(
-        projectId
-    );
-
-
-    projects =
-        projects.filter(
-            p => p.id !== projectId
-        );
-
-
+    await removeProject(projectId);
+    projects = projects.filter(p => p.id !== projectId);
     render();
 }
 
+async function deleteSection(projectId, sectionId) {
+    const project = projects.find(p => p.id === projectId);
+    if (!project) return;
 
-async function deleteSection(
-    projectId,
-    sectionId
-) {
+    const section = project.sections.find(s => s.id === sectionId);
+    if (!section) return;
 
-    const project =
-        projects.find(
-            p => p.id === projectId
-        );
-
-
-    if (!project) {
+    if (!confirm(`Arbeitsschritt "${section.title}" wirklich löschen?`)) {
         return;
     }
-
-
-    const section =
-        project.sections.find(
-            s => s.id === sectionId
-        );
-
-
-    if (!section) {
-        return;
-    }
-
-
-    if (
-        !confirm(
-            `Arbeitsschritt "${section.title}" wirklich löschen?`
-        )
-    ) {
-        return;
-    }
-
 
     const updated = {
-
         ...project,
-
-        sections:
-            project.sections.filter(
-                s =>
-                    s.id !== sectionId
-            )
+        sections: project.sections.filter(s => s.id !== sectionId)
     };
 
-
-    await saveProject(
-        updated
-    );
-
-
-    projects =
-        sortProjects(
-            projects.map(
-                p =>
-                    p.id === projectId
-                        ? updated
-                        : p
-            )
-        );
-
-
+    await saveProject(updated);
+    projects = sortProjects(projects.map(p => p.id === projectId ? updated : p));
     render();
 }
 
@@ -2924,11 +2349,7 @@ async function deleteSection(
 
 function openSettingsModal() {
 
-    const modal =
-        document.getElementById(
-            "modal-container"
-        );
-
+    const modal = document.getElementById("modal-container");
 
     modal.innerHTML = `
 
@@ -2942,29 +2363,22 @@ function openSettingsModal() {
                         Einstellungen
                     </h2>
 
-
                     <button
                         onclick="closeModal()"
                         class="p-2 rounded-lg hover:bg-slate-800 text-slate-400">
-
                         ${icons.close}
-
                     </button>
 
                 </div>
-
 
                 <form
                     onsubmit="saveSyncCode(event)"
                     class="p-5 space-y-5">
 
-
                     <div>
-
                         <label class="block text-sm font-medium text-slate-300 mb-2">
                             Vorhandenen Sync-Code
                         </label>
-
 
                         <input
                             id="sync-code"
@@ -2972,56 +2386,38 @@ function openSettingsModal() {
                             class="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white outline-none focus:border-blue-500"
                             placeholder="z. B. mein-makerboard-2026">
 
-
                         <p class="text-xs text-slate-500 mt-2">
                             Verwende den bereits vorhandenen Code deiner Datenbank.
                             Auf allen Geräten mit demselben Code werden dieselben Projekte geladen.
                         </p>
-
                     </div>
 
-
                     <div class="rounded-xl bg-slate-900 border border-slate-800 p-4">
-
                         <div class="text-sm font-semibold text-white">
                             Synchronisation
                         </div>
-
-
                         <div class="text-xs text-slate-500 mt-1">
-
                             ${
                                 syncCode
-                                    ? "Aktiver Sync-Code: " +
-                                      escapeHtml(syncCode)
+                                    ? "Aktiver Sync-Code: " + escapeHtml(syncCode)
                                     : "Kein Sync-Code ausgewählt."
                             }
-
                         </div>
-
                     </div>
 
-
                     <div class="flex justify-end gap-2">
-
                         <button
                             type="button"
                             onclick="closeModal()"
                             class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300">
-
                             Abbrechen
-
                         </button>
-
 
                         <button
                             type="submit"
                             class="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold">
-
                             Speichern
-
                         </button>
-
                     </div>
 
                 </form>
@@ -3032,168 +2428,69 @@ function openSettingsModal() {
     `;
 }
 
-
-async function saveSyncCode(
-    event
-) {
-
+async function saveSyncCode(event) {
     event.preventDefault();
 
-
-    const input =
-        document.getElementById(
-            "sync-code"
-        );
-
-
-    const value =
-        input.value.trim();
-
+    const input = document.getElementById("sync-code");
+    const value = input.value.trim();
 
     if (!value) {
-
-        showToast(
-            "Bitte einen vorhandenen Sync-Code eingeben.",
-            "error"
-        );
-
+        showToast("Bitte einen vorhandenen Sync-Code eingeben.", "error");
         return;
     }
 
-
-    syncCode =
-        value;
-
-
-    localStorage.setItem(
-        "makerboard_sync_code",
-        syncCode
-    );
-
+    syncCode = value;
+    localStorage.setItem("makerboard_sync_code", syncCode);
 
     closeModal();
-
-
     subscribeToProjects();
-
-
-    showToast(
-        "Sync-Code übernommen"
-    );
+    showToast("Sync-Code übernommen");
 }
-
-
-/* =========================================================
-   MODAL SCHLIESSEN
-========================================================= */
 
 function closeModal() {
-
-    const modal =
-        document.getElementById(
-            "modal-container"
-        );
-
-
-    if (modal) {
-        modal.innerHTML = "";
-    }
+    const modal = document.getElementById("modal-container");
+    if (modal) modal.innerHTML = "";
 }
 
 
 /* =========================================================
-   GLOBALE FUNKTIONEN
+   GLOBALE WINDOW REGISTRIERUNG
 ========================================================= */
 
-window.openProjectModal =
-    openProjectModal;
-
-window.openSettingsModal =
-    openSettingsModal;
-
-window.openSectionModal =
-    openSectionModal;
-
-window.saveProjectForm =
-    saveProjectForm;
-
-window.saveSectionForm =
-    saveSectionForm;
-
-window.saveSyncCode =
-    saveSyncCode;
-
-window.startSection =
-    startSection;
-
-window.pauseSection =
-    pauseSection;
-
-window.completeSection =
-    completeSection;
-
-window.editProject =
-    editProject;
-
-window.editSection =
-    editSection;
-
-window.deleteProject =
-    deleteProject;
-
-window.deleteSection =
-    deleteSection;
-
-window.toggleProject =
-    toggleProject;
-
-window.toggleSchedule =
-    toggleSchedule;
-
-window.toggleSection =
-    toggleSection;
-
-window.closeModal =
-    closeModal;
+window.openProjectModal = openProjectModal;
+window.openSettingsModal = openSettingsModal;
+window.openSectionModal = openSectionModal;
+window.saveProjectForm = saveProjectForm;
+window.saveSectionForm = saveSectionForm;
+window.saveSyncCode = saveSyncCode;
+window.startSection = startSection;
+window.pauseSection = pauseSection;
+window.completeSection = completeSection;
+window.editProject = editProject;
+window.editSection = editSection;
+window.deleteProject = deleteProject;
+window.deleteSection = deleteSection;
+window.toggleProject = toggleProject;
+window.toggleSchedule = toggleSchedule;
+window.toggleSection = toggleSection;
+window.closeModal = closeModal;
 
 
 /* =========================================================
-   ZEIT AKTUALISIEREN
+   ZEIT AKTUALISIEREN & INITIAL RENDER
 ========================================================= */
 
-setInterval(
-    () => {
-
-        now =
-            Date.now();
-
-
-        const activeSections =
-            projects.some(
-                project =>
-                    (project.sections || [])
-                        .some(
-                            section =>
-                                section.startedAt &&
-                                !section.pausedAt &&
-                                !section.completed &&
-                                !section.completedAt
-                        )
-            );
-
-
-        if (activeSections) {
-            render();
-        }
-
-    },
-    30000
-);
-
-
-/* =========================================================
-   INITIAL
-========================================================= */
+setInterval(() => {
+    now = Date.now();
+    const activeSections = projects.some(project =>
+        (project.sections || []).some(section =>
+            section.startedAt && !section.pausedAt && !section.completed && !section.completedAt
+        )
+    );
+    if (activeSections) {
+        render();
+    }
+}, 30000);
 
 render();
 
