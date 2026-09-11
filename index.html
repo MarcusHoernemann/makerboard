@@ -53,16 +53,11 @@
             overflow-x: auto;
             overflow-y: hidden;
             scrollbar-width: thin;
-            scrollbar-color: #475569 transparent;
-        }
-
-        .timeline-grid {
-            min-width: 750px;
+            scrollbar-color: #475569 #0f172a;
         }
 
         .timeline-row {
-            display: grid;
-            grid-template-columns: 260px 1fr;
+            display: flex;
             min-height: 76px;
             border-top: 1px solid rgba(148, 163, 184, 0.10);
         }
@@ -72,12 +67,15 @@
         }
 
         .timeline-label {
+            width: 260px;
+            min-width: 260px;
+            max-width: 260px;
             padding: 12px 14px;
             border-right: 1px solid rgba(148, 163, 184, 0.12);
-            background: rgba(15, 23, 42, 0.96);
+            background: #0b1329;
             position: sticky;
             left: 0;
-            z-index: 5;
+            z-index: 15;
         }
 
         .timeline-row.collapsed .timeline-label {
@@ -87,38 +85,41 @@
 
         .timeline-area {
             position: relative;
-            min-width: 490px;
+            flex-grow: 1;
             background-image:
                 linear-gradient(
                     to right,
                     rgba(148, 163, 184, 0.08) 1px,
                     transparent 1px
                 );
-            background-size: 60px 100%;
+            background-size: 55px 100%;
         }
 
         .timeline-header {
-            display: grid;
-            grid-template-columns: 260px 1fr;
+            display: flex;
             min-height: 44px;
             border-bottom: 1px solid rgba(148, 163, 184, 0.14);
             position: sticky;
             top: 0;
-            z-index: 10;
+            z-index: 20;
+            background: #0f172a;
         }
 
         .timeline-header-label {
+            width: 260px;
+            min-width: 260px;
+            max-width: 260px;
             padding: 12px 14px;
-            background: #0f172a;
+            background: #0b1329;
             border-right: 1px solid rgba(148, 163, 184, 0.12);
             position: sticky;
             left: 0;
-            z-index: 12;
+            z-index: 25;
         }
 
         .timeline-hours {
             position: relative;
-            min-width: 490px;
+            flex-grow: 1;
             background: #0f172a;
         }
 
@@ -126,11 +127,12 @@
             position: absolute;
             top: 0;
             bottom: 0;
-            border-left: 1px solid rgba(148, 163, 184, 0.14);
-            color: #64748b;
+            border-left: 1px solid rgba(148, 163, 184, 0.18);
+            color: #94a3b8;
             font-size: 11px;
-            padding-left: 5px;
-            padding-top: 7px;
+            font-weight: 500;
+            padding-left: 6px;
+            padding-top: 12px;
             white-space: nowrap;
         }
 
@@ -140,7 +142,7 @@
             height: 32px;
             border-radius: 8px;
             min-width: 8px;
-            transition: width 0.5s ease;
+            transition: width 0.3s ease;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
         }
 
@@ -273,7 +275,7 @@
         }
 
         ::-webkit-scrollbar-track {
-            background: transparent;
+            background: #0f172a;
         }
 
         ::-webkit-scrollbar-thumb {
@@ -535,21 +537,18 @@ function getTimelineHours(project) {
     return Math.max(1, Math.ceil(maximumHours));
 }
 
-// Berechnet dynamische Markierungsschritte (z. B. 1, 2, 5, 10, 20 Std.)
+function getTimelineStep(totalHours) {
+    if (totalHours <= 10) return 1;
+    if (totalHours <= 24) return 2;
+    if (totalHours <= 60) return 5;
+    if (totalHours <= 120) return 10;
+    return 20;
+}
+
 function getTimelineMarkers(totalHours) {
-    let step = 1;
-
-    if (totalHours > 80) {
-        step = 20;
-    } else if (totalHours > 40) {
-        step = 10;
-    } else if (totalHours > 20) {
-        step = 5;
-    } else if (totalHours > 10) {
-        step = 2;
-    }
-
+    const step = getTimelineStep(totalHours);
     const markers = [];
+
     for (let h = 0; h <= totalHours; h += step) {
         markers.push(h);
     }
@@ -562,11 +561,7 @@ function getTimelineMarkers(totalHours) {
 }
 
 function formatTimelineLabel(hours) {
-
-    if (hours === 0) {
-        return "0 Min.";
-    }
-
+    if (hours === 0) return "0h";
     return `${hours}h`;
 }
 
@@ -1219,11 +1214,15 @@ function renderSchedule(project) {
     const markers =
         getTimelineMarkers(totalHours);
 
+    // Garantiert mindestens 55px Platz pro Stunde (z.B. 43h * 55px = 2365px Timeline)
+    const dynamicAreaWidthPx =
+        Math.max(600, totalHours * 55);
+
     return `
 
         <div class="rounded-xl overflow-hidden border border-slate-800 timeline-scroll">
 
-            <div class="bg-slate-900 timeline-grid">
+            <div style="min-width: ${dynamicAreaWidthPx + 260}px;">
 
                 <div class="timeline-header">
 
@@ -1231,7 +1230,7 @@ function renderSchedule(project) {
                         ARBEITSSCHRITT
                     </div>
 
-                    <div class="timeline-hours">
+                    <div class="timeline-hours" style="width: ${dynamicAreaWidthPx}px;">
 
                         ${markers.map(hour => {
 
@@ -1245,7 +1244,7 @@ function renderSchedule(project) {
 
                                 <div
                                     class="hour-marker"
-                                    style="left:${left}%">
+                                    style="left:${left}%;">
 
                                     ${formatTimelineLabel(hour)}
 
@@ -1264,7 +1263,8 @@ function renderSchedule(project) {
                         renderTimelineRow(
                             project.id,
                             section,
-                            totalHours
+                            totalHours,
+                            dynamicAreaWidthPx
                         )
                     ).join("")}
 
@@ -1304,7 +1304,8 @@ function renderSchedule(project) {
 function renderTimelineRow(
     projectId,
     section,
-    totalHours
+    totalHours,
+    dynamicAreaWidthPx
 ) {
 
     const collapsed =
@@ -1350,7 +1351,7 @@ function renderTimelineRow(
 
     width =
         Math.max(
-            1.2,
+            0.5,
             Math.min(
                 100,
                 width
@@ -1533,7 +1534,7 @@ function renderTimelineRow(
 
             </div>
 
-            <div class="timeline-area">
+            <div class="timeline-area" style="width: ${dynamicAreaWidthPx}px;">
 
                 <div
                     class="task-bar ${barClass}"
