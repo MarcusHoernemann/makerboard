@@ -535,12 +535,18 @@ function subscribeToProjects() {
             const list = [];
             snapshot.forEach(item => {
                 const data = item.data();
+                const rawSections = data.sections || data.tasks || [];
+                const safeSections = rawSections.map((sec, idx) => ({
+                    ...sec,
+                    id: sec.id ? String(sec.id) : (item.id + '_sec_' + idx)
+                }));
+
                 list.push({
                     id: item.id,
                     name: data.name || data.title || "Unbenanntes Projekt",
                     urgency: data.urgency ?? data.priority ?? 3,
                     createdAt: data.createdAt || 0,
-                    sections: data.sections || data.tasks || [],
+                    sections: safeSections,
                     ...data
                 });
             });
@@ -643,26 +649,43 @@ const icons = {
 ========================================================= */
 
 function toggleProject(projectId) {
-    const isCurrentlyCollapsed = collapsedProjects[projectId] ?? false;
-    collapsedProjects[projectId] = !isCurrentlyCollapsed;
+    const key = String(projectId);
+    if (collapsedProjects[key] === true) {
+        collapsedProjects[key] = false;
+    } else {
+        collapsedProjects[key] = true;
+    }
     render();
 }
 
 function toggleSchedule(projectId) {
-    const isCurrentlyCollapsed = collapsedSchedules[projectId] ?? false;
-    collapsedSchedules[projectId] = !isCurrentlyCollapsed;
+    const key = String(projectId);
+    if (collapsedSchedules[key] === true) {
+        collapsedSchedules[key] = false;
+    } else {
+        collapsedSchedules[key] = true;
+    }
     render();
 }
 
 function toggleSection(sectionId) {
-    const isCurrentlyCollapsed = collapsedSections[sectionId] ?? true;
-    collapsedSections[sectionId] = !isCurrentlyCollapsed;
+    const key = String(sectionId);
+    // Standard ist eingeklappt (true). Wenn nicht false, schalte sofort auf false (aufklappen).
+    if (collapsedSections[key] === false) {
+        collapsedSections[key] = true;
+    } else {
+        collapsedSections[key] = false;
+    }
     render();
 }
 
 function toggleDescription(sectionId) {
-    const isCurrentlyExpanded = expandedDescriptions[sectionId] ?? false;
-    expandedDescriptions[sectionId] = !isCurrentlyExpanded;
+    const key = String(sectionId);
+    if (expandedDescriptions[key] === true) {
+        expandedDescriptions[key] = false;
+    } else {
+        expandedDescriptions[key] = true;
+    }
     render();
 }
 
@@ -713,9 +736,9 @@ function renderEmptyState() {
 function renderProject(project) {
     const progress = getProjectProgress(project);
     const completed = isProjectCompleted(project);
-    const collapsed = collapsedProjects[project.id] ?? false;
+    const collapsed = collapsedProjects[String(project.id)] === true;
     const priority = getPriority(project.urgency);
-    const scheduleCollapsed = collapsedSchedules[project.id] ?? false;
+    const scheduleCollapsed = collapsedSchedules[String(project.id)] === true;
     const sectionCount = project.sections?.length || 0;
 
     return `
@@ -822,8 +845,8 @@ function renderSchedule(project) {
 }
 
 function renderTimelineRow(projectId, section, totalHours, dynamicAreaWidthPx) {
-    const collapsed = collapsedSections[section.id] ?? true;
-    const isDescExpanded = expandedDescriptions[section.id] ?? false;
+    const isCollapsed = collapsedSections[String(section.id)] !== false;
+    const isDescExpanded = expandedDescriptions[String(section.id)] === true;
     const plannedDuration = Number(section.duration) || 1;
     const actualWorkMs = getActualWorkMs(section);
 
@@ -880,13 +903,13 @@ function renderTimelineRow(projectId, section, totalHours, dynamicAreaWidthPx) {
     }
 
     return `
-        <div class="timeline-row ${collapsed ? "collapsed" : ""}">
+        <div class="timeline-row ${isCollapsed ? "collapsed" : ""}">
             <div class="timeline-label">
                 <div class="flex items-center gap-1.5">
-                    <button onclick="toggleSection('${section.id}')" class="shrink-0 p-0.5 rounded hover:bg-slate-800 text-slate-400">
-                        ${collapsed ? icons.chevronRight : icons.chevronDown}
+                    <button type="button" onclick="event.stopPropagation(); toggleSection('${section.id}')" class="shrink-0 p-0.5 rounded hover:bg-slate-800 text-slate-400">
+                        ${isCollapsed ? icons.chevronRight : icons.chevronDown}
                     </button>
-                    <div class="font-medium text-xs sm:text-sm text-slate-200 truncate cursor-pointer select-none" onclick="toggleSection('${section.id}')" title="${escapeHtml(section.title)}">
+                    <div class="font-medium text-xs sm:text-sm text-slate-200 truncate cursor-pointer select-none" onclick="event.stopPropagation(); toggleSection('${section.id}')" title="${escapeHtml(section.title)}">
                         ${escapeHtml(section.title)}
                     </div>
                 </div>
@@ -899,7 +922,7 @@ function renderTimelineRow(projectId, section, totalHours, dynamicAreaWidthPx) {
                         ${statusText}
                     </span>
                 </div>
-                ${collapsed ? "" : `
+                ${isCollapsed ? "" : `
                     <div class="flex flex-col gap-0.5 text-[11px] text-slate-500 mt-1.5">
                         <span>Soll: ${plannedText}</span>
                         <span>Ist: ${actualText}</span>
@@ -924,7 +947,7 @@ function renderTimelineRow(projectId, section, totalHours, dynamicAreaWidthPx) {
                 </div>
 
                 ${section.description ? `
-                    <div onclick="toggleDescription('${section.id}')" title="${escapeHtml(section.description)}" class="mt-1 pb-2 text-[11px] text-slate-400/90 cursor-pointer select-none transition-all duration-200 hover:text-slate-200 ${isDescExpanded ? "whitespace-normal line-clamp-3 bg-slate-950/50 p-2 rounded-lg border border-slate-800/80" : "truncate max-w-full"}">
+                    <div onclick="event.stopPropagation(); toggleDescription('${section.id}')" title="${escapeHtml(section.description)}" class="mt-1 pb-2 text-[11px] text-slate-400/90 cursor-pointer select-none transition-all duration-200 hover:text-slate-200 ${isDescExpanded ? "whitespace-normal line-clamp-3 bg-slate-950/50 p-2 rounded-lg border border-slate-800/80" : "truncate max-w-full"}">
                         <span class="text-slate-500 font-mono mr-1 font-semibold">ℹ</span>${escapeHtml(section.description)}
                     </div>
                 ` : ""}
