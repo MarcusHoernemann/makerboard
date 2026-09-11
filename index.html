@@ -57,7 +57,7 @@
         }
 
         .timeline-grid {
-            min-width: 900px;
+            min-width: 750px;
         }
 
         .timeline-row {
@@ -87,7 +87,7 @@
 
         .timeline-area {
             position: relative;
-            min-width: 660px;
+            min-width: 490px;
             background-image:
                 linear-gradient(
                     to right,
@@ -100,7 +100,7 @@
         .timeline-header {
             display: grid;
             grid-template-columns: 260px 1fr;
-            min-height: 48px;
+            min-height: 44px;
             border-bottom: 1px solid rgba(148, 163, 184, 0.14);
             position: sticky;
             top: 0;
@@ -108,7 +108,7 @@
         }
 
         .timeline-header-label {
-            padding: 13px 14px;
+            padding: 12px 14px;
             background: #0f172a;
             border-right: 1px solid rgba(148, 163, 184, 0.12);
             position: sticky;
@@ -118,7 +118,7 @@
 
         .timeline-hours {
             position: relative;
-            min-width: 660px;
+            min-width: 490px;
             background: #0f172a;
         }
 
@@ -506,7 +506,7 @@ function sortProjects(projectList) {
 
 
 /* =========================================================
-   ZEITSTRAHL
+   ZEITSTRAHL - DYNAMISCHE SKALIERUNG
 ========================================================= */
 
 function getTimelineHours(project) {
@@ -535,17 +535,39 @@ function getTimelineHours(project) {
     return Math.max(1, Math.ceil(maximumHours));
 }
 
+// Berechnet dynamische Markierungsschritte (z. B. 1, 2, 5, 10, 20 Std.)
+function getTimelineMarkers(totalHours) {
+    let step = 1;
+
+    if (totalHours > 80) {
+        step = 20;
+    } else if (totalHours > 40) {
+        step = 10;
+    } else if (totalHours > 20) {
+        step = 5;
+    } else if (totalHours > 10) {
+        step = 2;
+    }
+
+    const markers = [];
+    for (let h = 0; h <= totalHours; h += step) {
+        markers.push(h);
+    }
+
+    if (markers[markers.length - 1] !== totalHours) {
+        markers.push(totalHours);
+    }
+
+    return markers;
+}
+
 function formatTimelineLabel(hours) {
 
     if (hours === 0) {
         return "0 Min.";
     }
 
-    if (hours === 1) {
-        return "1 Std.";
-    }
-
-    return `${hours} Std.`;
+    return `${hours}h`;
 }
 
 
@@ -617,7 +639,7 @@ function getPriority(priority) {
 
 
 /* =========================================================
-   FIREBASE SYNCHRONISATION (DIREKTE ROOT-COLLECTION: projects)
+   FIREBASE SYNCHRONISATION (/projects)
 ========================================================= */
 
 function getCollectionRef() {
@@ -638,11 +660,9 @@ function subscribeToProjects() {
         colRef,
         snapshot => {
             const list = [];
-            console.log(`[Makerboard] Snapshot empfangen aus /projects (${snapshot.size} Dokumente)`);
 
             snapshot.forEach(item => {
                 const data = item.data();
-                console.log(`- Projekt [${item.id}]:`, data);
 
                 list.push({
                     id: item.id,
@@ -659,7 +679,7 @@ function subscribeToProjects() {
         },
         error => {
             console.error("[Makerboard] Firestore Sync Fehler:", error);
-            showToast("Fehler beim Laden der Projekte: " + error.message, "error");
+            showToast("Fehler beim Laden: " + error.message, "error");
         }
     );
 }
@@ -695,7 +715,6 @@ onAuthStateChanged(
     auth,
     user => {
         if (user) {
-            console.log("[Makerboard] Anonym angemeldet (UID:", user.uid + ")");
             subscribeToProjects();
         }
     }
@@ -710,7 +729,6 @@ async function authenticate() {
         }
     } catch (error) {
         console.error("[Makerboard] Auth Fehler:", error);
-        // Falls Auth fehlschlägt, versuchen wir trotzdem den Snapshot
         subscribeToProjects();
     }
 }
@@ -1195,27 +1213,17 @@ function renderSchedule(project) {
         `;
     }
 
-
     const totalHours =
         getTimelineHours(project);
 
-
-    const hours = [];
-
-    for (
-        let h = 0;
-        h <= totalHours;
-        h++
-    ) {
-        hours.push(h);
-    }
-
+    const markers =
+        getTimelineMarkers(totalHours);
 
     return `
 
-        <div class="rounded-xl overflow-hidden border border-slate-800">
+        <div class="rounded-xl overflow-hidden border border-slate-800 timeline-scroll">
 
-            <div class="bg-slate-900">
+            <div class="bg-slate-900 timeline-grid">
 
                 <div class="timeline-header">
 
@@ -1223,10 +1231,9 @@ function renderSchedule(project) {
                         ARBEITSSCHRITT
                     </div>
 
-
                     <div class="timeline-hours">
 
-                        ${hours.map(hour => {
+                        ${markers.map(hour => {
 
                             const left =
                                 (
@@ -1251,8 +1258,7 @@ function renderSchedule(project) {
 
                 </div>
 
-
-                <div class="timeline-grid">
+                <div class="timeline-rows">
 
                     ${sections.map(section =>
                         renderTimelineRow(
@@ -1267,7 +1273,6 @@ function renderSchedule(project) {
             </div>
 
         </div>
-
 
         <div class="flex flex-wrap items-center gap-4 mt-3 text-xs text-slate-500">
 
@@ -1305,14 +1310,11 @@ function renderTimelineRow(
     const collapsed =
         collapsedSections[section.id] ?? true;
 
-
     const plannedDuration =
         Number(section.duration) || 1;
 
-
     const actualWorkMs =
         getActualWorkMs(section);
-
 
     let status =
         "planned";
@@ -1321,25 +1323,16 @@ function renderTimelineRow(
         section.completed ||
         section.completedAt
     ) {
-
-        status =
-            "completed";
-
+        status = "completed";
     } else if (
         section.pausedAt
     ) {
-
-        status =
-            "paused";
-
+        status = "paused";
     } else if (
         section.startedAt
     ) {
-
-        status =
-            "active";
+        status = "active";
     }
-
 
     const durationHours =
         status === "planned"
@@ -1349,13 +1342,11 @@ function renderTimelineRow(
                 actualWorkMs / 3600000
             );
 
-
     let width =
         (
             durationHours /
             totalHours
         ) * 100;
-
 
     width =
         Math.max(
@@ -1366,45 +1357,29 @@ function renderTimelineRow(
             )
         );
 
-
-    let barClass =
-        "task-bar-planned";
+    let barClass = "task-bar-planned";
 
     if (status === "active") {
-        barClass =
-            "task-bar-active";
+        barClass = "task-bar-active";
     }
 
     if (status === "paused") {
-        barClass =
-            "task-bar-paused";
+        barClass = "task-bar-paused";
     }
 
     if (status === "completed") {
-        barClass =
-            "task-bar-completed";
+        barClass = "task-bar-completed";
     }
 
-
-    let statusText =
-        "Geplant";
+    let statusText = "Geplant";
 
     if (status === "active") {
-
-        statusText =
-            "Läuft";
-
+        statusText = "Läuft";
     } else if (status === "paused") {
-
-        statusText =
-            "Pausiert";
-
+        statusText = "Pausiert";
     } else if (status === "completed") {
-
-        statusText =
-            "Beendet";
+        statusText = "Beendet";
     }
-
 
     const plannedText =
         `${plannedDuration} Std. geplant`;
@@ -1412,78 +1387,50 @@ function renderTimelineRow(
     const actualText =
         `Tatsächlich: ${formatDuration(actualWorkMs)}`;
 
-
     let buttonHtml = "";
 
-
     if (status === "planned") {
-
         buttonHtml = `
-
             <button
                 onclick="startSection('${projectId}', '${section.id}')"
                 class="flex items-center gap-1 px-2 py-1 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold">
-
                 ${icons.play}
-
                 Starten
-
             </button>
         `;
-
     } else if (status === "active") {
-
         buttonHtml = `
-
             <button
                 onclick="pauseSection('${projectId}', '${section.id}')"
                 class="flex items-center gap-1 px-2 py-1 rounded-md bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold">
-
                 ${icons.pause}
-
                 Pause
-
             </button>
-
 
             <button
                 onclick="completeSection('${projectId}', '${section.id}')"
                 class="flex items-center gap-1 px-2 py-1 rounded-md bg-green-600 hover:bg-green-500 text-white text-xs font-semibold">
-
                 ${icons.check}
-
                 Beenden
-
             </button>
         `;
-
     } else if (status === "paused") {
-
         buttonHtml = `
-
             <button
                 onclick="startSection('${projectId}', '${section.id}')"
                 class="flex items-center gap-1 px-2 py-1 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold">
-
                 ${icons.play}
-
                 Fortsetzen
-
             </button>
-
 
             <button
                 onclick="completeSection('${projectId}', '${section.id}')"
                 class="flex items-center gap-1 px-2 py-1 rounded-md bg-green-600 hover:bg-green-500 text-white text-xs font-semibold">
-
                 ${icons.check}
-
                 Beenden
-
             </button>
         `;
     }
-
 
     return `
 
@@ -1505,7 +1452,6 @@ function renderTimelineRow(
 
                     </button>
 
-
                     <div
                         class="font-medium text-sm text-slate-200 truncate"
                         title="${escapeHtml(section.title)}">
@@ -1515,7 +1461,6 @@ function renderTimelineRow(
                     </div>
 
                 </div>
-
 
                 <div class="flex items-center gap-2 mt-1 text-xs">
 
@@ -1535,7 +1480,6 @@ function renderTimelineRow(
 
                 </div>
 
-
                 ${
                     collapsed
                         ? ""
@@ -1553,7 +1497,6 @@ function renderTimelineRow(
 
                             </div>
 
-
                             ${
                                 section.description
                                     ? `
@@ -1564,11 +1507,9 @@ function renderTimelineRow(
                                     : ""
                             }
 
-
                             <div class="flex gap-1 mt-2">
 
                                 ${buttonHtml}
-
 
                                 <button
                                     onclick="editSection('${projectId}', '${section.id}')"
@@ -1577,7 +1518,6 @@ function renderTimelineRow(
                                     ${icons.edit}
 
                                 </button>
-
 
                                 <button
                                     onclick="deleteSection('${projectId}', '${section.id}')"
@@ -1592,7 +1532,6 @@ function renderTimelineRow(
                 }
 
             </div>
-
 
             <div class="timeline-area">
 
@@ -1646,18 +1585,15 @@ function openProjectModal(
             )
             : null;
 
-
     const modal =
         document.getElementById(
             "modal-container"
         );
 
-
     const currentPriority =
         Number(
             project?.urgency
         ) || 3;
-
 
     modal.innerHTML = `
 
@@ -1671,7 +1607,6 @@ function openProjectModal(
                         ${project ? "Projekt bearbeiten" : "Neues Projekt"}
                     </h2>
 
-
                     <button
                         onclick="closeModal()"
                         class="p-2 rounded-lg hover:bg-slate-800 text-slate-400">
@@ -1682,18 +1617,15 @@ function openProjectModal(
 
                 </div>
 
-
                 <form
                     onsubmit="saveProjectForm(event, '${project ? project.id : ""}')"
                     class="p-5 space-y-4">
-
 
                     <div>
 
                         <label class="block text-sm font-medium text-slate-300 mb-2">
                             Projektname
                         </label>
-
 
                         <input
                             id="project-name"
@@ -1704,13 +1636,11 @@ function openProjectModal(
 
                     </div>
 
-
                     <div>
 
                         <label class="block text-sm font-medium text-slate-300 mb-2">
                             Priorität
                         </label>
-
 
                         <select
                             id="project-urgency"
@@ -1750,7 +1680,6 @@ function openProjectModal(
 
                     </div>
 
-
                     <div class="flex justify-end gap-2 pt-2">
 
                         <button
@@ -1761,7 +1690,6 @@ function openProjectModal(
                             Abbrechen
 
                         </button>
-
 
                         <button
                             type="submit"
