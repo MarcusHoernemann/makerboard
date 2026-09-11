@@ -159,7 +159,7 @@
 
         .task-bar {
             position: absolute;
-            top: 22px;
+            top: 18px;
             height: 32px;
             border-radius: 8px;
             min-width: 8px;
@@ -590,6 +590,7 @@ let now = Date.now();
 const collapsedProjects = {};
 const collapsedSections = {};
 const collapsedSchedules = {};
+const expandedDescriptions = {};
 
 /* =========================================================
    PRIORITÄTEN
@@ -873,6 +874,11 @@ function toggleSchedule(projectId) {
 
 function toggleSection(sectionId) {
     collapsedSections[sectionId] = !collapsedSections[sectionId];
+    render();
+}
+
+function toggleDescription(sectionId) {
+    expandedDescriptions[sectionId] = !expandedDescriptions[sectionId];
     render();
 }
 
@@ -1307,6 +1313,9 @@ function renderTimelineRow(
     const collapsed =
         collapsedSections[section.id] ?? true;
 
+    const isDescExpanded =
+        expandedDescriptions[section.id] ?? false;
+
     const plannedDuration =
         Number(section.duration) || 1;
 
@@ -1494,16 +1503,6 @@ function renderTimelineRow(
 
                             </div>
 
-                            ${
-                                section.description
-                                    ? `
-                                        <div class="text-[11px] text-slate-500 mt-1.5 line-clamp-2">
-                                            ${escapeHtml(section.description)}
-                                        </div>
-                                    `
-                                    : ""
-                            }
-
                             <div class="flex flex-wrap gap-1 mt-2">
 
                                 ${buttonHtml}
@@ -1530,35 +1529,54 @@ function renderTimelineRow(
 
             </div>
 
-            <div class="timeline-area" style="width: ${dynamicAreaWidthPx}px;">
+            <div class="timeline-area flex flex-col justify-start relative px-3 pt-2" style="width: ${dynamicAreaWidthPx}px;">
 
-                <div
-                    class="task-bar ${barClass}"
-                    style="
-                        left:0%;
-                        width:${width}%;
-                    "
-                    title="${escapeHtml(section.title)}">
+                <div class="relative h-[36px] w-full">
+                    <div
+                        class="task-bar !top-0 ${barClass}"
+                        style="
+                            left:0%;
+                            width:${width}%;
+                        "
+                        title="${escapeHtml(section.title)}">
 
-                    ${
-                        status !== "planned"
-                            ? `
-                                <span class="absolute inset-0 flex items-center px-2 sm:px-3 text-[11px] sm:text-xs font-semibold text-white truncate">
+                        ${
+                            status !== "planned"
+                                ? `
+                                    <span class="absolute inset-0 flex items-center px-2 sm:px-3 text-[11px] sm:text-xs font-semibold text-white truncate">
 
-                                    ${
-                                        status === "active"
-                                            ? "Läuft"
-                                            : status === "paused"
-                                                ? "Pausiert"
-                                                : "Beendet"
-                                    }
+                                        ${
+                                            status === "active"
+                                                ? "Läuft"
+                                                : status === "paused"
+                                                    ? "Pausiert"
+                                                    : "Beendet"
+                                        }
 
-                                </span>
-                            `
-                            : ""
-                    }
+                                    </span>
+                                `
+                                : ""
+                        }
 
+                    </div>
                 </div>
+
+                ${
+                    section.description
+                        ? `
+                            <div
+                                onclick="toggleDescription('${section.id}')"
+                                title="${escapeHtml(section.description)}"
+                                class="mt-1 pb-2 text-[11px] text-slate-400/90 cursor-pointer select-none transition-all duration-200 hover:text-slate-200 ${
+                                    isDescExpanded
+                                        ? "whitespace-normal line-clamp-3 bg-slate-950/40 p-1.5 rounded-md border border-slate-800/60"
+                                        : "truncate"
+                                }">
+                                <span class="text-slate-500 font-mono mr-1 font-semibold">ℹ</span>${escapeHtml(section.description)}
+                            </div>
+                        `
+                        : ""
+                }
 
             </div>
 
@@ -2165,6 +2183,7 @@ window.deleteSection = deleteSection;
 window.toggleProject = toggleProject;
 window.toggleSchedule = toggleSchedule;
 window.toggleSection = toggleSection;
+window.toggleDescription = toggleDescription;
 window.closeModal = closeModal;
 
 /* =========================================================
